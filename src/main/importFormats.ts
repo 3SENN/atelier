@@ -334,7 +334,11 @@ function engineFrom(name: string, url: string): ImportedEngine | null {
     .replace(/\{searchTerms\}/g, '%s')
     .replace(/\{google:[A-Za-z]+\}/g, '')
     .replace(/\{(inputEncoding|outputEncoding)\??\}/g, 'UTF-8')
-    .replace(/[?&]\w+=\{[^}]*\}/g, '')
+    // Preserve query separators in both the URL and any fragment-based route.
+    .replace(/(^|#)([^?#]*)\?([^#]*)/g, (_, separator: string, base: string, query: string) => {
+      const params = query.split('&').filter((param) => !/^\w+=\{[^}]*\}$/.test(param))
+      return `${separator}${base}${params.length ? '?' + params.join('&') : ''}`
+    })
   if (!/^https?:\/\/[^\s]*%s/.test(template) || template.length > 2048 || /\{[^}]*\}/.test(template)) return null
   return { name: clean, template }
 }
