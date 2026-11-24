@@ -25,8 +25,8 @@ updates:
       - dependency-name: 'three'
       - dependency-name: '@types/three'
     groups:
-      # pdf.js on its own: 6.5 made reading a PDF about four times slower on the Windows runner (#9), so it gets its
-      # own pull request instead of holding back the others.
+      # pdf.js on its own: a new version can change how fast PDFs read (6.5 was slower on the CI runners, #9 and #10),
+      # so it gets its own pull request instead of holding back the others.
       pdfjs:
         patterns: ['pdfjs-dist']
       minor-and-patch:
