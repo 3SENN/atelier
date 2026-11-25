@@ -18,7 +18,8 @@ function filesUnder(dir: string, ...exts: string[]): string[] {
   for (const name of readdirSync(dir)) {
     const path = join(dir, name)
     if (statSync(path).isDirectory()) out.push(...filesUnder(path, ...exts))
-    else if (exts.some((e) => name.endsWith(e))) out.push(path)
+    // Forward slashes on every platform, so the lists below match on Windows too.
+    else if (exts.some((e) => name.endsWith(e))) out.push(path.replaceAll('\\', '/'))
   }
   return out
 }
