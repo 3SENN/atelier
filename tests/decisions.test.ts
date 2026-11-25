@@ -175,14 +175,15 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-function makeDecisions(settings: DecisionsSettings, fetch: FetchLike, quick: Parameters<typeof claudeDecide>[0] | null = null): { d: Decisions; keys: DecisionKeys } {
+function makeDecisions(settings: DecisionsSettings, fetch: FetchLike, quick: Parameters<typeof claudeDecide>[0] | null = null, device?: { available(): boolean }): { d: Decisions; keys: DecisionKeys } {
   const keys = new DecisionKeys(dir, sealer)
-  for (const m of settings.models) if (isPreset(m.provider) && !keys.has(m.provider)) keys.set(m.provider, 'ts-test-key')
+  for (const m of settings.models) if (isPreset(m.provider) && PROVIDER_DEFAULTS[m.provider].keyUrl !== '' && !keys.has(m.provider)) keys.set(m.provider, 'ts-test-key')
   const d = new Decisions({
     dataDir: dir,
     settings: () => settings,
     keys,
     fetch,
+    ...(device ? { device } : {}),
     now: () => clock,
     quick: () =>
       quick
@@ -869,8 +870,8 @@ describe('the decider', () => {
   })
 
   it('takes every listed provider from the same table, with its own key, address and request', async () => {
-    expect(DECISION_PRESETS).toEqual(['typesafe', 'openrouter', 'experiential', 'openai'])
-    for (const provider of DECISION_PRESETS) {
+    expect(DECISION_PRESETS).toEqual(['device', 'typesafe', 'openrouter', 'experiential', 'openai'])
+    for (const provider of DECISION_PRESETS.filter((p) => PROVIDER_DEFAULTS[p].keyUrl !== '')) {
       const model = PROVIDER_DEFAULTS[provider].suggested
       const reply: Reply =
         provider === 'openai'
@@ -1082,6 +1083,25 @@ describe('the decider', () => {
     stop.abort()
     await expect(requestDecision(fetch, endpoint0, { state: 'x', questions: { ok: { type: 'noul', instructions: 'ok?' } } }, { timeoutMs: 1_000, signal: stop.signal })).rejects.toMatchObject({ code: 'timeout' })
     expect(fetch.calls).toHaveLength(0)
+  })
+
+  it('answers on this computer with the on-device model: no key, its own address, one request, and the rule without its files', async () => {
+    const installed = { available: () => true }
+    const local = fakeFetch([{ ...noulReply('waits', 0.05, 'atelier-nano'), delayMs: 400 }])
+    const { d } = makeDecisions(settingsWith({ provider: 'device' }), local, null, installed)
+    expect(d.status().keys.device).toBe(false)
+    expect(d.status().connected.device).toBe(true)
+    await expect(d.decide(call(true))).resolves.toBe(false)
+    // Never hedged (a second request would only queue behind the first), never with a key.
+    expect(local.calls).toHaveLength(1)
+    expect(local.calls[0]!.url).toBe('atelier-device://nano/v1/systemone')
+    expect(local.calls[0]!.headers.authorization).toBeUndefined()
+    // Its files gone: not connected, nothing sent, the rule decides.
+    const none = fakeFetch([noulReply('waits', 0.05)])
+    const missing = makeDecisions(settingsWith({ provider: 'device' }), none, null, { available: () => false }).d
+    expect(missing.status().connected.device).toBe(false)
+    await expect(missing.decide(call(true))).resolves.toBe(true)
+    expect(none.calls).toHaveLength(0)
   })
 
   it('never sends a second request to a server on this computer, however it is named', async () => {

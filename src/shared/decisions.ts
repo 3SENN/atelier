@@ -39,9 +39,24 @@ export interface DecisionPreset {
   keyUrl: string
   /** Decision models it serves that its model list doesn't show. */
   models?: readonly string[]
+  /** Runs on this computer (src/main/decisions/device.ts): no key, nothing sent anywhere; connected once its files are here. */
+  onDevice?: true
 }
 
+/** The on-device model's address: requests to it never leave this computer (src/main/decisions/device.ts). */
+export const DEVICE_SCHEME = 'atelier-device:'
+
 export const PROVIDER_DEFAULTS = {
+  // Atelier's own small decision model, on this computer: distilled for these decisions, a few milliseconds a question.
+  device: {
+    url: 'atelier-device://nano/v1/systemone',
+    dialect: 'systemone',
+    modelsUrl: 'atelier-device://nano/v1/models',
+    listsDecisionModelsOnly: true,
+    suggested: 'atelier-nano',
+    keyUrl: '',
+    onDevice: true,
+  },
   typesafe: {
     url: 'https://api.typesafe.ai/v1/systemone',
     dialect: 'systemone',
@@ -381,7 +396,20 @@ export interface DecisionsStatus {
   /** Decisions answered by a model since start-up, and how many of those differed from Atelier's rule. */
   answered: number
   differed: number
+  /** The on-device model's optional larger half (atelier-mini): whether it is here, downloading, or can be downloaded. */
+  mini?: MiniStatus
 }
+
+/**
+ * atelier-mini, the on-device model's optional download (src/main/decisions/deviceMini.ts). unavailable: no download
+ * for this computer; absent: can be downloaded (total bytes); external: a folder set from outside, not managed here.
+ */
+export type MiniStatus =
+  | { state: 'unavailable' }
+  | { state: 'absent'; total: number }
+  | { state: 'downloading'; received: number; total: number }
+  | { state: 'ready'; external: boolean }
+  | { state: 'failed'; error: string; total: number }
 
 export const DECISION_ERROR_CODES = ['no-key', 'unauthorized', 'rate-limited', 'overloaded', 'timeout', 'offline', 'bad-request', 'bad-reply', 'failed'] as const
 export type DecisionErrorCode = (typeof DECISION_ERROR_CODES)[number]
@@ -445,5 +473,9 @@ export interface DecisionsServices {
     /** The new tab's composer: would this text be better as a web search or a question for the companion? `current` (the composer's mode) comes back unless a decision model is on and sure. */
     searchOrAsk(text: string, current: 'search' | 'ask'): Promise<'search' | 'ask'>
     openKeyPage(provider: DecisionPresetId): void
+    /** atelier-mini: starts its download (the status shows progress), stops it, or removes the installed model. */
+    installMini(): Promise<DecisionsStatus>
+    cancelMini(): Promise<DecisionsStatus>
+    removeMini(): Promise<DecisionsStatus>
   }
 }

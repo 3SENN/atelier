@@ -5,14 +5,19 @@
 
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { net, safeStorage, shell } from 'electron'
+import { app as electronApp, net, safeStorage, shell, utilityProcess } from 'electron'
 import { PROVIDER_DEFAULTS, type DecisionQuestion, type DecisionsServices } from '@shared/decisions'
 import { looksLikeAddress } from '@shared/url'
 import type { Feature } from '../features/types'
 import { mainT } from '../i18n/mainT'
+import { log } from '../log'
 import { registerResetStep } from '../reset'
+import { appRoot } from '../resources'
 import { registerStorageCategory } from '../storage'
 import type { FetchLike } from './client'
+import { DeviceDecisions, deviceModelDir } from './device'
+import { MINI_MANIFEST } from './device/miniManifest'
+import { MiniInstaller } from './deviceMini'
 import { DecisionKeys, KEYS_FILE } from './keys'
 import { COMPARISONS_FILE, Decisions, setDecider } from './service'
 import { registerLabelItems } from './tool'
@@ -158,15 +163,51 @@ export function createDecisionsFeature(): Feature {
         seal: (text) => (app.smoke ? Buffer.from(text, 'utf8') : safeStorage.encryptString(text)),
         open: (data) => (app.smoke ? data.toString('utf8') : safeStorage.decryptString(data)),
       })
+      // Atelier's own decision model, in a utility process that starts on the first question (device.ts).
+      // Its larger half, atelier-mini, is an optional download (deviceMini.ts); ATELIER_DECISION_MINI uses a folder as it is.
+      let mini: MiniInstaller | null = null
+      const device = new DeviceDecisions({
+        modelDir: () => (app.smoke ? null : deviceModelDir({ packaged: electronApp.isPackaged, resourcesPath: process.resourcesPath, appPath: appRoot() })),
+        miniDir: () => (app.smoke ? null : (mini?.dir() ?? null)),
+        spawner: (dir, miniDir) =>
+          utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), miniDir ? [dir, miniDir] : [dir], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
+      })
+      const installer = new MiniInstaller({
+        dir: process.env.ATELIER_DECISION_MINI || join(app.dataDir, 'decision-model-mini'),
+        manifest: MINI_MANIFEST,
+        external: Boolean(process.env.ATELIER_DECISION_MINI),
+        base: process.env.ATELIER_DECISION_MINI_URL,
+        // net.fetch: the system's proxy settings, like Atelier's other downloads.
+        download: async (url, init) => {
+          const res = await net.fetch(url, { signal: init.signal, headers: init.headers })
+          return { status: res.status, body: res.body as AsyncIterable<Uint8Array> | null }
+        },
+        release: () => device.restart(),
+      })
+      mini = installer
+      stops.push(() => {
+        installer.cancel()
+        device.dispose()
+      })
       const d = new Decisions({
         dataDir: app.dataDir,
         settings: () => app.settings.get().decisions,
         keys,
-        fetch: app.smoke ? smokeFetch : electronFetch,
+        // atelier-device:// is answered on this computer (device.ts), everything else over the network.
+        fetch: app.smoke ? smokeFetch : device.route(electronFetch),
         quick: () => app.quick ?? null,
+        device,
+        mini: installer,
       })
       decider = d
       setDecider(d)
+      // With the on-device model among your models, it loads in the background once Atelier has started.
+      const warm = setTimeout(() => {
+        const s = app.settings.get().decisions
+        if (s.on && s.models.some((m) => PROVIDER_DEFAULTS[m.provider as keyof typeof PROVIDER_DEFAULTS]?.keyUrl === '')) device.warm()
+      }, 10_000)
+      warm.unref?.()
+      stops.push(() => clearTimeout(warm))
       registerLabelItems()
       // A key never outlives its server: one left by a server removed while a save failed goes now.
       try {
@@ -222,8 +263,22 @@ export function createDecisionsFeature(): Feature {
         comparisons: async () => d.comparisons(),
         clearComparisons: async () => d.clearComparisons(),
         searchOrAsk: searchOrAskOnce,
+        installMini: async () => {
+          void installer.install().then(() => log.info('decisions', 'atelier-mini download ended', { status: installer.status().state }))
+          return d.status()
+        },
+        cancelMini: async () => {
+          installer.cancel()
+          return d.status()
+        },
+        removeMini: async () => {
+          installer.remove()
+          return d.status()
+        },
         openKeyPage: (provider) => {
-          if (!app.smoke) void shell.openExternal(PROVIDER_DEFAULTS[provider].keyUrl).catch(() => undefined)
+          // The on-device model has no key and no page to make one.
+          const url = PROVIDER_DEFAULTS[provider].keyUrl
+          if (!app.smoke && url) void shell.openExternal(url).catch(() => undefined)
         },
       }
       return { decisions: services }

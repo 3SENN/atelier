@@ -82,6 +82,7 @@ everything else is System One.
 | OpenRouter | `https://openrouter.ai/api/alpha/decisions` | `/api/v1/models?output_modalities=decisions` | `typesafe/jev-1.14` | One key for 36 decision models from many makers (Jev, Clef, GPT-6 Luna, Liquid, Perplexity, Microsoft, Upstage and more, three of them free on 12 November 2026), all through System One's request; its router answers `refusal` where a model declines a question, read as unsure |
 | Experiential Labs | `https://api.experientiallabs.ai/v1/systemone` | `/v1/models` | `clef-flash` | A gateway; your `xpl_` key. It also serves `clef`, `jev-latest` and `gpt-6-luna-decisions` (sent to its `/v1/decisions`), each listed with its price and data policy. Its Clef models are listed with zero data retention and no training; `jev-latest` there is passed on to TypeSafe without those terms, and Luna to OpenAI without training |
 | OpenAI Decisions | `https://api.openai.com/v1/decisions` | `/v1/models` | `gpt-6-luna` | Your OpenAI key; $0.10 per million tokens read |
+| On this computer | `atelier-device://nano/v1/systemone` (no network) | itself | `atelier-nano` | Atelier's own model, below; no key, nothing sent anywhere; listed first |
 | Your own server | any address (`/v1/systemone` or `/v1/decisions` added by model) | next to it | | Any other System One or Decisions service, or a server you run: Kev (Apache-2.0, Qwen-based, MLX on Apple Silicon) and the like; a key only if it asks |
 
 The providers are one table (`PROVIDER_DEFAULTS` in src/shared/decisions.ts):
@@ -126,6 +127,90 @@ model that answered with a rate limit this session never get one; a 429
 keeps the second from going out, and with both out the one that met it stops
 without its retry. The usage ledger counts a second request's input tokens, and the
 answer time shown is from the first send.
+
+## On this computer
+
+Atelier's own decision model (`device` in `PROVIDER_DEFAULTS`) answers Atelier's questions without a key, without
+the network and without sending anything anywhere. It is a small multilingual encoder (all 22 layers of
+mmBERT-small, a 44k-token vocabulary trimmed for English, Dutch, German, French and Spanish, 54 MB with int8 layers
+and a 4-bit embedding table: atelier-nano v0.3), distilled from Perplexity's decision models
+(pplx-decider-flash-v1.3, checked against v1.3's 26B) on Atelier's own questions. Atelier's fixed questions reach it
+as a one-token tag instead of their wording, so a question is about 60 tokens and takes about 10 ms on two threads
+of an ordinary CPU; open questions (label_items, routines, packs) keep their full wording.
+
+- It runs in a utility process (src/main/decisions/device.ts, deviceHelper.ts) that starts on the first
+  question (under a second, loading the model) and stops after five quiet minutes; a crash is a failed request, so
+  the rule decides, and three in a row make it unavailable until Atelier restarts. Requests to
+  `atelier-device://` go there through the decider's fetch, so timeouts, compare mode, comparisons and the
+  readers' cutoffs work as for any provider, and it is never hedged (a second request would only queue).
+- Its files (model, tokenizer, vocabulary map, per-decision calibration) are in Resources/decision-model in a
+  build and native/decisions/build in development. `node scripts/fetch-decision-model.mjs` (part of
+  `npm run package`) downloads the pinned version from the atelier-decisions project on Hugging Face (nano v0.3,
+  saved as v0.6) and checks every file's size and SHA-256; `ATELIER_DECISION_MODEL_SRC=<export>` copies a local
+  export instead, and `ATELIER_DECISION_MODEL` points a run elsewhere. Without them the provider reads Not
+  installed and nothing changes.
+- It answers Atelier's own decisions only. Questions that are not Atelier's (label_items, routine conditions,
+  packs) get `refusal`, read as an even spread: on questions and text it never saw, its sure answers contradicted
+  the teacher's 6% of the time (36% for one kind), against under 1% on Atelier's own, so the rule, or Claude
+  where a caller falls back to it, decides those.
+- It declines text it can't read: when under 70% of a state's letters are Latin script, or over 10% of its tokens
+  are raw bytes (characters outside its vocabulary), every question gets `refusal`. Measured on unseen requests in
+  20 languages: English, Dutch, German, French and Spanish, and Italian, Portuguese, Swedish and Indonesian too,
+  contradict the teacher in at most 1.3% of answers and are answered; Russian, Greek, Arabic, Chinese, Japanese,
+  Korean, Hindi, Hebrew and Thai are declined (Arabic without the guard: 6.7% contradicted, 15% sure where the
+  teacher wasn't), and so are most Polish and Turkish texts.
+- Its temperatures are fitted per decision on held-out teacher answers with Atelier's costs: a sure answer the
+  teacher contradicts costs most; for "worth remembering", voice and dictation, being sure where the teacher was
+  unsure costs more than handing back to the rule, and for the click guard a missed stop does.
+- Measuring it: the eval above runs against it like any server (`runtime/node` in the model project serves the
+  same files on 127.0.0.1), and the model project keeps the training data, the teachers' answers and a parity
+  check between this runtime and its training code.
+
+### New kinds of questions: atelier-mini (an optional download)
+
+What the small model declines or is unsure about can go to a larger one on the same computer: atelier-mini
+(Qwen3.5-2B read the way a decision model reads, 1.3 GB with 4- and 5-bit weights, run by llama.cpp's
+`llama-server` on the CPU). It is not part of Atelier's download: Settings › Quick decisions › On this computer
+offers it under "New kinds of questions" once the small model is ready, and it can be removed there.
+
+- **The cascade** (src/main/decisions/device/cascade.ts): every question goes to the small model first. A
+  `refusal` (an open question, text it can't read) or an answer Atelier's reader would not take (readers.ts, the
+  same cutoffs as uses.ts) goes to the mini; what the mini is unsure about stays unsure, so the rule decides. A
+  reply says which model answered each question (`routes`), and `model` reads `atelier-nano+mini` when the mini
+  answered any.
+- **What it buys** (measured in the model project, v0.6, analysis/cascade.py): on Atelier's own held-out decisions
+  the pair decides 77% (the small model alone 72%) and is right on 94% of those, with 28% of questions reaching
+  the mini; Atelier's eval passes 10 of 10 tests and email labeling is answered instead of declined. On kinds of
+  questions the small model never saw it decides 50-78% and is right on 87-98% of those; on numbers checked
+  against the true answer, 60% and 89%. On security questions with known answers (credentials in a message, a
+  prompt injection, a link or download that isn't what it says) it decides 93% and is right on 94%. On rules
+  applied to the specifics on a page (a booking, a renewal, an entry that has to meet two to four conditions and an
+  exception) it decides 78% and is right on 84%.
+- **Where it is weak**: it is still sure and wrong on 5% of those security questions and on 13% of the rules
+  questions (19% for kinds of rules it never trained on): never the only guard there. Arithmetic in several steps
+  (percentages, totals) it mostly leaves to the rule: it decides 16% of those.
+- **Cost**: about 0.3-0.7 s a question (so live decisions with a budget under a second mostly keep the rule when
+  the small model is unsure, and a slower computer leaves more of them to the rule), up to 2 GB of memory while
+  the helper runs, a few seconds to load cold. It loads on
+  the first question the small model leaves open, not at start-up, and stops with the helper after five quiet
+  minutes. A stopped or timed-out request is cancelled in the helper too, so the mini's queue moves on.
+- **Its server**: the helper starts `llama-server` (the folder's `server/`, llama.cpp's CPU build for this
+  platform) on 127.0.0.1 at a free port, sends it token ids and reads the hidden state at the answer marker; the
+  readout and the per-decision temperature are applied in the helper (mini.ts). The helper tells device.ts the
+  server's process id, and device.ts stops it with the helper: a killed utility process would leave it running on
+  Windows.
+- **The download** (src/main/decisions/deviceMini.ts): every file is listed in `device/miniManifest.ts`, which
+  ships with Atelier, with its size and SHA-256 (made by the model project's tools/mini_dist.py from the files it
+  hosts), so whoever serves the files can't change what runs. Files go to `<data>/decision-model-mini.partial`, are
+  checked as they stream in, and the folder is swapped in whole only when all match; a stopped download resumes
+  with a range request. It needs the model's size plus 200 MB free. Downloads go through Electron's `net` (the
+  system's proxy). The files are hosted on Hugging Face (`3SENN/atelier-decisions`, under `dist/<version>/`), with
+  llama.cpp's CPU server for Windows (x64, arm64), macOS (arm64, x64) and Linux (x64, arm64). While the manifest has
+  no download location (`base` empty), or no server build for this platform, the row isn't shown.
+- **Development**: `ATELIER_DECISION_MINI=<folder>` uses a folder as it is (the model project's runtime folder plus
+  a `server/` with llama-server), never downloaded into or removed; `ATELIER_DECISION_MINI_URL=<base>` tries a
+  download location. `ATELIER_MINI_PARITY=<runtime folder> npx vitest run tests/decisionsDeviceMini.test.ts` checks
+  that mini.ts makes the training code's token ids (608 of 608).
 
 ## The rule-first contract (DC-01)
 
@@ -365,5 +450,6 @@ itself and handed 25 to `label_items` on its own, which answered all 25.
   first message (so caching and earlier thinking stay valid), and a connector
   left out could never be used later in that chat; every enabled connector
   stays in.
-- No local model is bundled: "Another provider or your own server" points at
-  one you run (Kev's 0.8B model runs on any Apple Silicon Mac).
+- The on-device model loads in the background ten seconds after start when it is among your models, but stops
+  after five quiet minutes, so the first question after a quiet spell waits for it to load again (under a second),
+  which a voice decision's 0.7 s can miss (the rule decides).

@@ -9,6 +9,7 @@ import { join } from 'node:path'
 import {
   COMPARISONS_MAX,
   DECISION_PRESETS,
+  DEVICE_SCHEME,
   EXCERPT_MAX,
   PROVIDER_DEFAULTS,
   isPreset,
@@ -25,6 +26,7 @@ import {
   type DecisionsStatus,
   type DecisionTestResult,
   type DecisionUse,
+  type MiniStatus,
 } from '@shared/decisions'
 import { EngineUnavailableError, type QuickModel } from '../agent/quick'
 import { recordUsage } from '../agent/usageSink'
@@ -156,6 +158,10 @@ export interface DecisionsDeps {
   keys: DecisionKeys
   fetch: FetchLike
   quick(): Pick<QuickModel, 'json' | 'ready'> | null
+  /** The on-device model (device.ts): whether its files are here. Absent, it reads as not installed. */
+  device?: { available(): boolean }
+  /** The on-device model's optional larger half (deviceMini.ts): its download state, shown in Settings. */
+  mini?: { status(): MiniStatus }
   now?: () => number
 }
 
@@ -188,9 +194,10 @@ interface ModelHealth {
 /** A model that fails this fast leaves time for the next; less than this left, the rule decides. */
 const NEXT_MODEL_MIN_MS = 300
 
-/** A server on this computer: a second request would only queue behind the first. */
+/** A server on this computer, or the on-device model: a second request would only queue behind the first. */
 function isLoopback(url: string): boolean {
   try {
+    if (new URL(url).protocol === DEVICE_SCHEME) return true
     return /^(localhost\.?|.+\.localhost\.?|127(?:\.\d+){3}|0\.0\.0\.0|\[::1\]|\[::ffff:(?:127(?:\.\d+){3}|7f[0-9a-f]{2}:[0-9a-f]{1,4})\])$/i.test(new URL(url).hostname)
   } catch {
     return false
@@ -386,6 +393,7 @@ export class Decisions implements Decider {
       }),
       answered: this.#answered,
       differed: this.#differed,
+      ...(this.#d.mini ? { mini: this.#d.mini.status() } : {}),
     }
   }
 
@@ -493,16 +501,19 @@ export class Decisions implements Decider {
 
   // ── The model call ──
 
-  /** Whether a provider can be asked: a preset with its key, or a server of yours (its key is optional). */
+  /** Whether a provider can be asked: a preset with its key (the on-device one once its files are here), or a server of yours (its key is optional). */
   #connected(provider: string, s: DecisionsSettings): boolean {
-    return isPreset(provider) ? this.#d.keys.has(provider) : s.servers.some((x) => x.id === provider)
+    if (!isPreset(provider)) return s.servers.some((x) => x.id === provider)
+    const preset: DecisionPreset = PROVIDER_DEFAULTS[provider]
+    return preset.onDevice ? this.#d.device?.available() === true : this.#d.keys.has(provider)
   }
 
   #endpointOf(ref: DecisionModelRef, s: DecisionsSettings): Endpoint | null {
     const key = this.#d.keys.get(ref.provider)
     if (isPreset(ref.provider)) {
-      if (!key) return null
       const preset: DecisionPreset = PROVIDER_DEFAULTS[ref.provider]
+      if (preset.onDevice) return this.#d.device?.available() ? endpointFor(preset.url, null, ref.model, preset.dialect) : null
+      if (!key) return null
       return endpointFor(preset.url, key, ref.model, preset.dialect)
     }
     const server = s.servers.find((x) => x.id === ref.provider)

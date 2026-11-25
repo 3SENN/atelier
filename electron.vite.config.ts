@@ -33,6 +33,8 @@ export default defineConfig({
           pdfWorker: resolve('src/main/pdf/worker.ts'),
           // Query_table's read-only connection runs here, out/main/tablesQueryWorker.js
           tablesQueryWorker: resolve('src/main/tables/queryWorker.ts'),
+          // The on-device decision model's utility process, out/main/decisionsDevice.js (src/main/decisions/device.ts)
+          decisionsDevice: resolve('src/main/decisions/deviceHelper.ts'),
         },
       },
     },

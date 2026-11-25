@@ -32,6 +32,7 @@ import {
   type DecisionProviderId,
   type DecisionsStatus,
   type DecisionTestResult,
+  type MiniStatus,
 } from '@shared/decisions'
 import type { SettingsPatch, SettingsView } from '@shared/ipc'
 import { call, errorText } from '../../api'
@@ -64,6 +65,20 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
   const d = settings.decisions
   // Both keep what they show while they reload, so a change never empties the page or loses its place.
   const status = useResource(() => call('decisions', 'status'), JSON.stringify([d.on, d.models, d.servers]), { keep: true })
+  // While atelier-mini downloads, its progress comes with the status: ask again each second.
+  const miniDownloading = status.data?.mini?.state === 'downloading'
+  useEffect(() => {
+    if (!miniDownloading) return
+    const timer = setInterval(() => void status.reload(), 1_000)
+    return () => clearInterval(timer)
+  }, [miniDownloading]) // eslint-disable-line react-hooks/exhaustive-deps
+  const miniAction = async (action: 'install' | 'cancel' | 'remove'): Promise<void> => {
+    try {
+      status.set(await call('decisions', action === 'install' ? 'installMini' : action === 'cancel' ? 'cancelMini' : 'removeMini'))
+    } catch (err) {
+      toast.show({ tone: 'error', message: errorText(err) })
+    }
+  }
   const connectedIds = Object.entries(status.data?.connected ?? {})
     .filter(([, on]) => on)
     .map(([id]) => id)
@@ -213,9 +228,21 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
     <Section title={t('decisions.section.providers')} note={t('decisions.privacy')}>
       <div className="dc-stack" data-settings-anchor="decisions-providers">
         <Card>
-          {DECISION_PRESETS.map((id) => (
-            <PresetRow key={id} id={id} hasKey={status.data?.keys[id] ?? false} onSave={(key) => saveKey(id, key)} onDisconnect={() => void disconnect(id)} />
-          ))}
+          {DECISION_PRESETS.map((id) =>
+            PROVIDER_DEFAULTS[id].keyUrl === '' ? (
+              <DeviceRow
+                key={id}
+                id={id}
+                installed={status.data?.connected[id] ?? false}
+                inUse={d.models.some((m) => m.provider === id)}
+                onUse={() => addModel({ provider: id, model: PROVIDER_DEFAULTS[id].suggested })}
+                mini={status.data?.mini}
+                onMini={(action) => void miniAction(action)}
+              />
+            ) : (
+              <PresetRow key={id} id={id} hasKey={status.data?.keys[id] ?? false} onSave={(key) => saveKey(id, key)} onDisconnect={() => void disconnect(id)} />
+            ),
+          )}
         </Card>
         <Card>
           {d.servers.map((server) => (
@@ -390,6 +417,75 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
         </p>
       )}
     </>
+  )
+}
+
+/** Atelier's own model on this computer: no key to connect, only whether its files are here and whether you use it; and its optional larger half, atelier-mini, to download or remove. */
+function DeviceRow({
+  id,
+  installed,
+  inUse,
+  onUse,
+  mini,
+  onMini,
+}: {
+  id: DecisionPresetId
+  installed: boolean
+  inUse: boolean
+  onUse(): void
+  mini?: MiniStatus
+  onMini(action: 'install' | 'cancel' | 'remove'): void
+}): ReactElement {
+  const t = useT()
+  const mb = (bytes: number): string => String(Math.round(bytes / 1e6))
+  return (
+    <div className="sp-row sp-row--stack" data-settings-anchor={`decisions-provider-${id}`}>
+      <div className="dc-provider">
+        <div className="dc-provider__text">
+          <span className="sp-field__label">
+            {t(`decisions.provider.${id}`)} <Badge tone={installed ? 'success' : 'neutral'}>{installed ? t('decisions.device.ready') : t('decisions.device.missing')}</Badge>
+          </span>
+          <span className="sp-field__hint">{t(`decisions.provider.${id}.description`)}</span>
+        </div>
+        <div className="dc-provider__actions">
+          {installed && !inUse && (
+            <Button size="sm" variant="secondary" onClick={onUse}>
+              {t('decisions.device.use')}
+            </Button>
+          )}
+        </div>
+      </div>
+      {installed && mini && mini.state !== 'unavailable' && (
+        <div className="dc-provider" data-settings-anchor="decisions-device-mini">
+          <div className="dc-provider__text">
+            <span className="sp-field__label">
+              {t('decisions.device.mini')}{' '}
+              {mini.state === 'ready' && <Badge tone="success">{t('decisions.device.mini.ready')}</Badge>}
+              {mini.state === 'downloading' && <Badge tone="info">{t('decisions.device.mini.downloading', { received: mb(mini.received), total: mb(mini.total) })}</Badge>}
+            </span>
+            <span className="sp-field__hint">{t('decisions.device.mini.description')}</span>
+            {mini.state === 'failed' && <p className="sp-field__error">{t('decisions.device.mini.failed', { error: mini.error })}</p>}
+          </div>
+          <div className="dc-provider__actions">
+            {(mini.state === 'absent' || mini.state === 'failed') && (
+              <Button size="sm" variant="secondary" onClick={() => onMini('install')}>
+                {t('decisions.device.mini.download', { size: mb(mini.total) })}
+              </Button>
+            )}
+            {mini.state === 'downloading' && (
+              <Button size="sm" variant="ghost" onClick={() => onMini('cancel')}>
+                {t('decisions.device.mini.cancel')}
+              </Button>
+            )}
+            {mini.state === 'ready' && !mini.external && (
+              <Button size="sm" variant="ghost" onClick={() => onMini('remove')}>
+                {t('decisions.device.mini.remove')}
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

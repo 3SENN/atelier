@@ -52,6 +52,10 @@ electronFuses:
 extraResources:
   - from: branding/official/resources
     to: resources
+  # The on-device decision model (scripts/fetch-decision-model.mjs; docs/decisions.md › On this device), about
+  # 30 MB on every platform. Without it the build ships without the model and the provider reads Not installed.
+  - from: native/decisions/build
+    to: decision-model
 # GitHub Releases, as a draft for the person to publish. scripts/release/release.mjs
 # fills in the owner and repo from ATELIER_RELEASE_OWNER and ATELIER_RELEASE_REPO; without
 # them no update feed is written and the app's updater stays off.

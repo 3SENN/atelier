@@ -25,5 +25,8 @@ export const DECISIONS_SCHEMAS: {
     clearComparisons: z.tuple([]),
     searchOrAsk: z.tuple([z.string().max(2_000), z.enum(['search', 'ask'])]),
     openKeyPage: z.tuple([z.enum(DECISION_PRESETS)]),
+    installMini: z.tuple([]),
+    cancelMini: z.tuple([]),
+    removeMini: z.tuple([]),
   },
 }
