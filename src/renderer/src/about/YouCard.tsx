@@ -33,7 +33,8 @@ const LEVEL_BARS: Record<TechLevel, number> = { simple: 1, mixed: 2, technical: 
 
 export function YouCard({ profile, name, avatar }: { profile: UserProfile; name: string | null; avatar: string | null }): ReactElement {
   const t = useT()
-  const shown = profile.name ?? name ?? t('settings.you.you')
+  // Settings › You › Name is where your name is kept; a profile from before that still shows its own.
+  const shown = name ?? profile.name ?? t('settings.you.you')
   return (
     <div className="you-card">
       <div className="you-card__head">

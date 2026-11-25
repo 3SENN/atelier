@@ -152,6 +152,8 @@ export class FakeWallet {
         return { ...a, id: 'a-new' } as unknown as AddressView
       },
       removeAddress: () => undefined,
+      mine: () => this.addressList.find((a) => a.mine) ?? null,
+      setMine: () => undefined,
       cards: () => this.cardList,
       cardForFill: () => ({ number: '4242424242424242', holder: 'Robin Vos', expMonth: 7, expYear: 2029 }),
       saveCard: (c) => {

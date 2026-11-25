@@ -43,8 +43,11 @@ export type Address = AddressInput & { id: string }
 export interface Wallet {
   addresses(): AddressView[]
   addressForFill(id: string): Address
-  saveAddress(a: AddressInput & { id?: string }): AddressView
+  saveAddress(a: AddressInput & { id?: string; mine?: boolean }): AddressView
   removeAddress(id: string): void
+  /** Your own address (Settings › You), or null when none is marked as yours. */
+  mine(): AddressView | null
+  setMine(id: string | null): void
   cards(): CardView[]
   /** Main only, never over IPC. */
   cardForFill(id: string): { number: string; holder: string; expMonth: number; expYear: number }

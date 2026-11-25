@@ -84,7 +84,7 @@ export interface RunOutcome {
 
 type TurnUsage = Pick<UsageRow, 'inputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens'>
 
-/** Latest plan wins and delegation cards upsert by id; a source already logged is skipped. Returns true when handled. */
+/** Latest plan wins, delegation and browser-steps cards upsert by id; a source already logged is skipped. Returns true when handled. */
 export function foldAgentToolsEvent(log: AgentEvent[], event: AgentEvent): boolean {
   if (event.type === 'plan') {
     for (let i = log.length - 1; i >= 0; i--) if (log[i]?.type === 'plan') log.splice(i, 1)
@@ -93,6 +93,12 @@ export function foldAgentToolsEvent(log: AgentEvent[], event: AgentEvent): boole
   }
   if (event.type === 'delegation') {
     const index = log.findIndex((e) => e.type === 'delegation' && e.id === event.id)
+    if (index >= 0) log[index] = event
+    else log.push(event)
+    return true
+  }
+  if (event.type === 'browser-steps') {
+    const index = log.findIndex((e) => e.type === 'browser-steps' && e.id === event.id)
     if (index >= 0) log[index] = event
     else log.push(event)
     return true

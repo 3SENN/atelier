@@ -100,6 +100,8 @@ export const decisions = {
   'decisions.device.mini.cancel': 'Stoppen',
   'decisions.device.mini.remove': 'Verwijderen',
   'decisions.device.mini.failed': 'De download is niet afgerond: {error}',
+  'decisions.device.step': 'Taken in de browser',
+  'decisions.device.step.description': 'Een klein model dat de taken van je companion in de browser pagina voor pagina afhandelt, zoals iets bestellen of een formulier invullen, in ongeveer een tiende seconde per pagina op deze computer. Waar het niet zeker van is, gaat terug naar je companion, en elke klik gaat nog steeds langs dezelfde controles en vraagt het je voordat er iets gekocht of verwijderd wordt.',
   'decisions.provider.typesafe': 'TypeSafe Jev',
   'decisions.provider.openrouter': 'OpenRouter',
   'decisions.provider.experiential': 'Experiential Labs',

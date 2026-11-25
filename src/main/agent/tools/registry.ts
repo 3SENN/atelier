@@ -118,6 +118,8 @@ export const CLIENT_TOOL_OWNERS = {
   list_packs: 'packs',
   // Quick decisions (docs/decisions.md › Your companion): many small judgment calls on the decision model.
   label_items: 'decisions',
+  // docs/decisions.md › Browser tasks: atelier-step takes a browser task page by page on this computer.
+  browser_steps: 'decisions',
 } as const
 
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/

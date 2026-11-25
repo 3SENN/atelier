@@ -13,6 +13,7 @@ import { atelier, errorText } from '../../api'
 import { Button, SaveStatus, useAutosave } from '../../ui'
 import { ApiKeyCard } from '../ApiKeyCard'
 import { AboutYouSection } from '../sections/AboutYou'
+import { YourDetailsSection } from '../sections/YourDetails'
 import { Avatar, Card, PageHeader, Row, Section, TextInput } from '../kit'
 import { AVATAR_PIXELS, avatarFileError, isAvatarDataUrl, squareCrop } from '../logic/avatar'
 import { useT } from '../../i18n/useT'
@@ -136,6 +137,7 @@ export function YouPage({ settings, onSettings, onOpenPage }: { settings: Settin
           </div>
         </Card>
       </Section>
+      <YourDetailsSection settings={settings} onSettings={onSettings} />
       <AboutYouSection userName={settings.userName} avatar={settings.userAvatar} />
       <Section title={t('settings.you.anthropicKey')} note={t('settings.you.chatsUseYourOwn')}>
         <ApiKeyCard settings={settings} onSettings={onSettings} variant="summary" onManage={() => onOpenPage('model')} />

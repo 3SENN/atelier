@@ -152,6 +152,7 @@ export function createPasswordsServices(deps: PasswordsServiceDeps): PasswordsSe
       addresses: () => wallet.addresses(),
       saveAddress: (a) => wallet.saveAddress(a),
       removeAddress: (id) => wallet.removeAddress(id),
+      setMine: (id) => wallet.setMine(id),
       cards: () => wallet.cards(),
       saveCard: (c) => wallet.saveCard(c),
       removeCard: (id) => wallet.removeCard(id),

@@ -197,6 +197,9 @@ export const passwords = {
 
   // Addresses (ST-43)
   'passwords.address.titleAdd': 'Add an address',
+  'passwords.address.mine': 'These are my own details',
+  'passwords.address.mine.description': 'Shown in Settings › You, offered first when you fill in a form, and known to your companion for tasks you give it. One address can be yours.',
+  'passwords.address.yours': 'Yours',
   'passwords.address.titleEdit': 'Edit address',
   'passwords.address.givenName': 'First name',
   'passwords.address.additionalName': 'Middle name',

@@ -30,6 +30,10 @@ import type { VaultCipher } from './vault'
 // views carry only brand, last four, expiry and holder, and cardForFill is
 // for the autofill controller. Security codes are never accepted or stored;
 // no type has a field for one. Nothing here is ever logged.
+//
+// One address can be yours (`mine`): your own name, email, phone and address,
+// shown in Settings › You and used first by autofill and your companion. It is
+// the one place Atelier keeps those details; nothing else holds a copy.
 
 interface StoredAddress extends Address {
   updatedAt: number
@@ -52,6 +56,8 @@ interface WalletData {
   strikes: Record<string, number>
   /** The HMAC key for card fingerprints; it lives inside the encrypted blob, so the keychain guards it. */
   hmacKey: string
+  /** The id of your own address, or '' when none is marked as yours. */
+  mine: string
 }
 
 export const WALLET_FILE = join('passwords', 'wallet.bin')
@@ -93,9 +99,29 @@ export function validateCard(input: CardInput, existing: StoredCard | null, now:
   return { number, holder: input.holder.trim().slice(0, 120), expMonth, expYear }
 }
 
-function addressView(a: StoredAddress): AddressView {
+function addressView(a: StoredAddress, mine: string): AddressView {
   const { updatedAt, id, ...fields } = a
-  return { ...fields, id, label: addressLabel(fields), updatedAt }
+  return { ...fields, id, label: addressLabel(fields), updatedAt, mine: id === mine }
+}
+
+const ADDRESS_KEYS = Object.keys(EMPTY_ADDRESS) as (keyof AddressInput)[]
+const norm = (s: string): string => s.normalize('NFKC').toLowerCase().replace(/[\s.,-]+/g, '')
+
+/**
+ * The saved address a new one is a copy of, so saving it fills that one in instead of adding a twin: every field
+ * the two both have agrees, and they share the person (or organisation) and the street, or one is the other with
+ * fields left out. An autofill offer, an import or your details saved again never leave two entries for one place.
+ */
+export function sameAddress(saved: readonly AddressInput[], next: AddressInput): number {
+  const filled = (a: AddressInput): (keyof AddressInput)[] => ADDRESS_KEYS.filter((k) => a[k].trim() !== '')
+  return saved.findIndex((x) => {
+    const both = ADDRESS_KEYS.filter((k) => x[k].trim() !== '' && next[k].trim() !== '')
+    if (both.length === 0 || !both.every((k) => norm(x[k]) === norm(next[k]))) return false
+    const who = (a: AddressInput): string => norm(`${a.givenName}${a.familyName}`) || norm(a.organization)
+    const shareWhoAndWhere = who(x) !== '' && who(x) === who(next) && norm(x.line1) !== '' && norm(x.line1) === norm(next.line1)
+    const subset = filled(next).every((k) => x[k].trim() !== '') || filled(x).every((k) => next[k].trim() !== '')
+    return shareWhoAndWhere || subset
+  })
 }
 
 function cardView(c: StoredCard): CardView {
@@ -112,7 +138,7 @@ export class WalletStore implements Wallet {
   readonly #listeners = new Set<Listener>()
   readonly #now: () => Date
 
-  /** `dataDir` is the profile's data folder (each profile has its own wallet). */
+  /** `dataDir` is Atelier's data folder: one wallet, shared by every browser profile (passwords/index.ts). */
   constructor(dataDir: string, cipher: VaultCipher, now: () => Date = () => new Date()) {
     this.#path = join(dataDir, WALLET_FILE)
     this.#cipher = cipher
@@ -137,9 +163,23 @@ export class WalletStore implements Wallet {
   // ── addresses ──
 
   addresses(): AddressView[] {
-    return this.#load()
-      .addresses.map(addressView)
-      .sort((a, b) => b.updatedAt - a.updatedAt)
+    const data = this.#load()
+    return data.addresses.map((a) => addressView(a, data.mine)).sort((a, b) => Number(b.mine) - Number(a.mine) || b.updatedAt - a.updatedAt)
+  }
+
+  mine(): AddressView | null {
+    const data = this.#load()
+    const found = data.addresses.find((a) => a.id === data.mine)
+    return found ? addressView(found, data.mine) : null
+  }
+
+  setMine(id: string | null): void {
+    const data = this.#load()
+    if (id !== null && !data.addresses.some((a) => a.id === id)) throw new Error(mainT('passwords.err.addressGone'))
+    if ((id ?? '') === data.mine) return
+    this.#change((next) => {
+      next.mine = id ?? ''
+    })
   }
 
   addressForFill(id: string): Address {
@@ -149,27 +189,36 @@ export class WalletStore implements Wallet {
     return address
   }
 
-  saveAddress(a: AddressInput & { id?: string }): AddressView {
+  saveAddress(a: AddressInput & { id?: string; mine?: boolean }): AddressView {
     const fields = validateAddress(a)
     return this.#change((data) => {
       const now = this.#now().getTime()
+      const mark = (id: string): void => {
+        if (a.mine === true) data.mine = id
+        else if (a.mine === false && data.mine === id) data.mine = ''
+      }
       if (a.id) {
         const index = data.addresses.findIndex((x) => x.id === a.id)
         if (index < 0) throw new Error(mainT('passwords.err.addressGone'))
         const next = { ...fields, id: a.id, updatedAt: now }
         data.addresses[index] = next
-        return addressView(next)
+        mark(a.id)
+        return addressView(next, data.mine)
       }
-      // The same address saved twice stays one entry.
-      const same = data.addresses.find((x) => (Object.keys(EMPTY_ADDRESS) as (keyof AddressInput)[]).every((k) => x[k].toLowerCase() === fields[k].toLowerCase()))
+      // A copy of a saved address fills that one in (its empty fields) instead of adding a twin.
+      const index = sameAddress(data.addresses, fields)
+      const same = data.addresses[index]
       if (same) {
+        for (const k of ADDRESS_KEYS) if (same[k].trim() === '' && fields[k] !== '') same[k] = fields[k]
         same.updatedAt = now
-        return addressView(same)
+        mark(same.id)
+        return addressView(same, data.mine)
       }
       if (data.addresses.length >= ADDRESSES_MAX) throw new Error(mainT('passwords.err.addressesFull'))
       const next = { ...fields, id: randomUUID(), updatedAt: now }
       data.addresses.push(next)
-      return addressView(next)
+      mark(next.id)
+      return addressView(next, data.mine)
     })
   }
 
@@ -177,6 +226,7 @@ export class WalletStore implements Wallet {
     if (!this.#load().addresses.some((a) => a.id === id)) return
     this.#change((data) => {
       data.addresses = data.addresses.filter((a) => a.id !== id)
+      if (data.mine === id) data.mine = ''
     })
   }
 
@@ -276,6 +326,7 @@ export class WalletStore implements Wallet {
       cards: current.cards.map((c) => ({ ...c })),
       strikes: { ...current.strikes },
       hmacKey: current.hmacKey,
+      mine: current.mine,
     }
     const out = fn(data)
     if (this.#broken) throw new Error(mainT('passwords.err.walletBroken'))
@@ -320,7 +371,7 @@ function strikeKey(fingerprint: string, site: string): string {
 }
 
 function emptyWallet(): WalletData {
-  return { addresses: [], cards: [], strikes: {}, hmacKey: '' }
+  return { addresses: [], cards: [], strikes: {}, hmacKey: '', mine: '' }
 }
 
 function parseWallet(parsed: unknown): WalletData {
@@ -332,7 +383,8 @@ function parseWallet(parsed: unknown): WalletData {
   if (v.strikes && typeof v.strikes === 'object') {
     for (const [k, n] of Object.entries(v.strikes as Record<string, unknown>)) if (typeof n === 'number') strikes[k] = n
   }
-  return { addresses, cards, strikes, hmacKey: typeof v.hmacKey === 'string' ? v.hmacKey : '' }
+  const mine = typeof v.mine === 'string' && addresses.some((a) => a.id === v.mine) ? v.mine : ''
+  return { addresses, cards, strikes, hmacKey: typeof v.hmacKey === 'string' ? v.hmacKey : '', mine }
 }
 
 function isStoredAddress(value: unknown): value is StoredAddress {

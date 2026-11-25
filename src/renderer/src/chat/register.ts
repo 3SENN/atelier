@@ -9,7 +9,7 @@ import { QuestionCard } from './cards/QuestionCard'
 import {
   AppBuiltCard,
   AutoApprovalRecord,
-  DelegationCard,
+  BrowserStepsCard, DelegationCard,
   FileWrittenCard,
   Nothing,
   QuestionRecord,
@@ -43,6 +43,7 @@ registerLogCard('skill-draft', SkillDraftCard)
 registerLogCard('app-built', AppBuiltCard)
 registerLogCard('pack-proposed', PackProposedCard) // docs/packs.md
 registerLogCard('delegation', DelegationCard)
+registerLogCard('browser-steps', BrowserStepsCard)
 registerLogCard('file-written', FileWrittenCard)
 registerLogCard('question', QuestionRecord)
 registerLogCard('site-access', SiteAccessRecord)

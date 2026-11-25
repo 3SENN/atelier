@@ -184,6 +184,7 @@ export function PasswordsSettingsPage({ settings, update }: SettingsPageProps): 
               <button type="button" className="sp-item__main" onClick={() => setAddress(a)}>
                 <span className="sp-item__title">
                   <span className="sp-item__title-text">{a.label}</span>
+                  {a.mine && <Badge tone="info">{t('passwords.address.yours')}</Badge>}
                 </span>
                 <span className="sp-item__sub">{[a.city, a.email, a.tel].filter(Boolean).join(' · ')}</span>
               </button>

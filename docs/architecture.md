@@ -248,7 +248,7 @@ The engine is MPL-2.0; the parts, rigs, face layers, presets and their recipes a
 | Agent safety | approval for consequential actions, a hard block on passwords and payment fields, `javascript_exec` and `file_upload` disabled, page content treated as untrusted |
 | Secrets | the API key and connector tokens are encrypted with `safeStorage` (Keychain on macOS) and written with mode 0600; memory never holds secrets |
 | Local MCP server | listens on loopback only, refuses browser origins and foreign hosts, and fails closed on a missing or wrong bearer token; chat tokens die with each launch and open one chat; the outside secret is encrypted and revocable |
-| Import | only bookmarks and history are imported, from copies of the other browser's files; never passwords or cookies |
+| Import | the other browser's files are only read (databases from a copy), never changed: bookmarks, history, tabs, search engines and saved addresses (into the encrypted wallet; card data is never read), plus sign-in cookies only when ticked (Chromium on macOS); passwords only from a CSV export |
 
 ## Sign-in compatibility
 

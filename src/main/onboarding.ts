@@ -9,7 +9,7 @@
 // saved as you go, so a restart resumes where you left off. Launch starts
 // the first chat, seeded from the answers; Atelier never edits the Dock.
 import { BRAND_NAME } from '@shared/branding'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { z } from 'zod'
 import {
@@ -30,8 +30,9 @@ import { profileFromAnswers, profileMemoryNote, workspacePlan, type PlanDirector
 import type { AgentHostApi } from './agent/hostApi'
 import type { QuickModel } from './agent/quick'
 import { log } from './log'
+import type { ResetStep } from './reset'
 import { writeAtomic } from './settings'
-import { applyWorkspace, interviewTurn, profileFromInterview, type UserProfileStore } from './userProfile'
+import { PROFILE_FILE, applyWorkspace, interviewTurn, profileFromInterview, type UserProfileStore } from './userProfile'
 
 export const SETUP_FILE = 'setup.json'
 
@@ -124,6 +125,13 @@ export class SetupStore {
     return this.#set({ ...this.#state, step: 'launch', finishedAt: now, updatedAt: now, notice: null })
   }
 
+  /** Reset (ST-55): the file goes and memory holds a fresh state, so a later save never writes the old progress back. */
+  forget(): void {
+    this.#state = freshSetupState(this.#now())
+    rmSync(this.#path, { force: true })
+    this.#onChange(this.#state)
+  }
+
   #set(state: SetupState): SetupState {
     this.#state = state
     this.#write()
@@ -137,6 +145,37 @@ export class SetupStore {
     } catch (err) {
       log.error('onboarding', 'Could not save setup progress', { error: err instanceof Error ? err.message : String(err) })
     }
+  }
+}
+
+export interface SetupResetDeps {
+  dataDir: string
+  setup: Pick<SetupStore, 'forget'>
+  profile: Pick<UserProfileStore, 'clear'>
+  /** The setup flow's other files in userData (dismissed tips, the Dock icon design, preset bases), removed with it. */
+  files?: readonly string[]
+}
+
+/**
+ * Reset Atelier's step for the setup flow (ST-55): setup.json, your profile
+ * (profile.json) and the given files. The two stores forget what they hold
+ * in memory too, so nothing writes them back before the restart.
+ */
+export function setupResetStep(deps: SetupResetDeps, label: string): ResetStep {
+  return {
+    id: 'setup',
+    order: 80,
+    label,
+    run: async ({ dryRun }) => {
+      const names = [SETUP_FILE, PROFILE_FILE, ...(deps.files ?? [])]
+      const removed = names.filter((name) => existsSync(join(deps.dataDir, name)))
+      if (!dryRun) {
+        deps.setup.forget()
+        deps.profile.clear()
+        for (const name of deps.files ?? []) rmSync(join(deps.dataDir, name), { recursive: true, force: true })
+      }
+      return { removed }
+    },
   }
 }
 
@@ -165,6 +204,9 @@ export interface ProfileDeps {
   timeZone(): string | null
   /** Writes a shared memory note (the About me note). */
   writeMemory(path: string, text: string): void
+  /** What you are called (Settings › You › Name): the one place your name is kept. Absent in tests that don't need it. */
+  userName?(): string
+  setUserName?(name: string): void
 }
 
 /** The onboarding methods added here; the original `complete` stays in index.ts. */
@@ -183,9 +225,11 @@ export function createOnboardingService(deps: OnboardingDeps): OnboardingMethods
     skills: you.skills,
   }
   const planFor = (p: UserProfile): WorkspacePlan => workspacePlan(p, { directory: you.directory(), skills: you.skills(), companionId: companionId(), timeZone: you.timeZone() }, you.destinations())
-  /** Saves the profile and rewrites the About me note companions read. */
+  /** Saves the profile and rewrites the About me note companions read. Your name is not kept here: Settings › You
+   *  holds it (setup's name fills it in when it is empty), so there is one place to change it. */
   const keep = (p: UserProfile): UserProfile => {
-    const saved = you.store.set(p)
+    if (p.name && you.setUserName && !you.userName?.().trim()) you.setUserName(p.name.slice(0, 40))
+    const saved = you.store.set(you.setUserName ? { ...p, name: null } : p)
     const note = profileMemoryNote(saved)
     if (note) {
       try {

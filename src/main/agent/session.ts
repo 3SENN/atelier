@@ -29,7 +29,7 @@ import { expandSkill, type ResolvedConnector } from '../stores'
 import type { TabManager } from '../tabs'
 import { stepCap, type AgentBackend, type BackendResult } from '../engines/backend' // One step cap for every engine
 import { BrowserToolExecutor, describeToolCall, errorMessage, runToolCalls, type ToolHandler } from './browserTool'
-import { systemPrompt } from './prompt'
+import { systemPrompt, type PersonDetails } from './prompt'
 import type { ChatError } from '@shared/chatErrors'
 import type { MessageSource } from '@shared/chats'
 import { classifyApiError, classifySaveError } from './errors'
@@ -223,7 +223,7 @@ function filesOf(client: Client): FilesApi | null {
 
 export interface SessionDeps {
   settings: {
-    get(): { model: string; effort: Effort; webTools: boolean; memory: boolean; confirmConsequentialActions: boolean; userName?: string; engine?: EngineId; documents?: boolean; unlimitedSteps?: boolean }
+    get(): { model: string; effort: Effort; webTools: boolean; memory: boolean; confirmConsequentialActions: boolean; userName?: string; shareDetails?: boolean; engine?: EngineId; documents?: boolean; unlimitedSteps?: boolean }
     view(): { hasApiKey: boolean }
     apiKey(): string | null
   }
@@ -236,6 +236,8 @@ export interface SessionDeps {
   companions: { find(id: string): Companion | undefined; active(): Companion }
   /** Looks up a persona's personality for the system prompt. */
   presets: { personality(persona: string): string | undefined }
+  /** The user's own details (the wallet's address marked as theirs, Settings › You), read when a chat starts; null when none. */
+  details?: () => PersonDetails | null
   /** Makes the API client; tests pass a fake. */
   client?: (apiKey: string | null) => Client
   /** Engines besides the API key (ST-59). An engine that is absent here isn't offered: drafts fall back to the API key. */
@@ -288,6 +290,12 @@ function savedDraft(summary: ChatSummary): DraftSetup {
     ...(summary.parentChatId ? { parentChatId: summary.parentChatId } : {}),
     ...(summary.routineRun ?? summary.routineId ? { kind: 'routine' as const } : {}),
   }
+}
+
+/** A chat's browser as a client tool drives it (AgentSession.chatBrowser). */
+export interface ChatBrowser {
+  step(name: string, input: unknown, signal: AbortSignal): Promise<Awaited<ReturnType<BrowserToolExecutor['execute']>>>
+  page(tabId?: string | null): ReturnType<BrowserToolExecutor['stepPage']>
 }
 
 /** One chat's conversation with the agent: its fixed setup, history, queue and approvals. */
@@ -926,6 +934,17 @@ export class AgentSession {
     return { text: head.text, ...(attachments ? { attachments } : {}), ...(head.source ? { source: head.source } : {}) }
   }
 
+  /**
+   * This chat's browser for a client tool that drives it (browser_steps, agent/tools/browserSteps.ts): each step goes
+   * through the same pause gate, site rules, click guard and approvals as the agent's own browser tool.
+   */
+  chatBrowser(): ChatBrowser {
+    return {
+      step: (name, input, signal) => this.#browserStep(name, input, signal),
+      page: (tabId) => this.executor.stepPage(tabId),
+    }
+  }
+
   /** A browser step waits while paused, and carries any notes for this chat's tabs. */
   async #browserStep(name: string, input: unknown, signal: AbortSignal): Promise<Awaited<ReturnType<BrowserToolExecutor['execute']>>> {
     // An interrupt also ends a step's waits (an approval, a page load); the steps after it are answered as interrupted.
@@ -1240,6 +1259,8 @@ export class AgentSession {
       instructions: companion.instructions,
       sharedMemory: true,
       userName: this.#deps.settings.get().userName,
+      // Your details, when you let your companion know them: frozen with the prompt, and never in a private chat.
+      details: !setup.private && this.#deps.settings.get().shareDetails !== false ? (this.#deps.details?.() ?? null) : null,
       // One usage line per tool group, and the project's instructions in their own block.
       clientTools: setup.clientTools,
       project: this.#agentTools.project(this.#options.projectId),

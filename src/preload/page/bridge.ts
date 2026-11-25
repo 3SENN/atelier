@@ -8,6 +8,7 @@
 // resolves elements and points for clicks, and fills form fields. Main asks
 // over PAGE.command and the reply goes back on PAGE.reply.
 import { BRAND_NAME } from '@shared/branding'
+import type { StepPage, StepPageItem } from '@shared/browserSteps'
 import { ipcRenderer } from 'electron'
 import {
   PAGE,
@@ -377,6 +378,113 @@ function readTree(root: Element, options: WalkOptions): string {
   return lines.join('\n')
 }
 
+// ---- the page for a browser step (atelier-step, docs/decisions.md › Browser tasks) ----
+
+/** Controls and text lines one step reads at most; the step model's input is cut at its own length after that. */
+const STEP_ITEMS_MAX = 160
+const STEP_TEXT_MAX = 160
+const STEP_CONTEXT_MAX = 160
+const STEP_ROW = 'li, tr, article, [role="listitem"], [role="row"], [role="article"]'
+/** A field with no form of its own belongs to the region it sits in: the header's search box is not the checkout's. */
+const STEP_REGION = 'form, [role="form"], fieldset, dialog, [role="dialog"], header, nav, main, aside, footer, section'
+
+function stepRole(el: Element, role: string): StepPageItem['role'] | null {
+  switch (role) {
+    case 'link': return 'link'
+    case 'button': case 'clickable': case 'menuitem': case 'tab': case 'option': case 'treeitem': return 'button'
+    case 'textbox': case 'searchbox': case 'spinbutton': return 'field'
+    case 'combobox': return tag(el) === 'select' ? 'select' : 'field'
+    case 'listbox': return tag(el) === 'select' ? 'select' : null
+    case 'checkbox': case 'switch': case 'menuitemcheckbox': return 'checkbox'
+    case 'radio': case 'menuitemradio': return 'radio'
+    default: return null
+  }
+}
+
+function stepGroup(el: Element, groups: Map<Element, string>): string {
+  const region = el.closest(STEP_REGION)
+  if (!region) return ''
+  let key = groups.get(region)
+  if (!key) {
+    key = `${tag(region)}-${groups.size + 1}`
+    groups.set(region, key)
+  }
+  return key
+}
+
+function stepContext(el: Element, label: string): string | undefined {
+  const row = el.parentElement?.closest(STEP_ROW)
+  const text = clean((row as HTMLElement | null)?.innerText ?? '', STEP_CONTEXT_MAX + 1)
+  if (!text || text === label || text.length > STEP_CONTEXT_MAX) return undefined
+  return text
+}
+
+function stepItem(el: Element, role: StepPageItem['role'], groups: Map<Element, string>): StepPageItem {
+  const name = accessibleName(el, roleOf(el))
+  const item: StepPageItem = { ref: refFor(el), role, label: name, group: stepGroup(el, groups) }
+  const t = tag(el)
+  if (role === 'field') {
+    const guarded = isPasswordField(el) || isPaymentField(el) || /\bone-time-code\b/i.test(el.getAttribute('autocomplete') ?? '')
+    if (guarded) item.guarded = true
+    const value = (el as HTMLElement).isContentEditable && t !== 'input' && t !== 'textarea' ? clean((el as HTMLElement).innerText) : (el as HTMLInputElement).value ?? ''
+    // A guarded field's content never leaves the page; only whether it is filled.
+    item.value = guarded ? (value ? '(filled)' : '') : clean(value, 200)
+    if (!item.label) item.label = clean(el.getAttribute('placeholder')) || clean(el.getAttribute('name'))
+  } else if (role === 'select') {
+    const select = el as HTMLSelectElement
+    const options = Array.from(select.options)
+    const chosen = select.selectedOptions[0]
+    // A first option like "Choose…" with no value is nothing chosen yet.
+    item.value = chosen && chosen.value !== '' ? clean(chosen.textContent) : ''
+    item.options = options.filter((o) => o.value !== '' || clean(o.textContent) === '').map((o) => clean(o.textContent)).filter(Boolean).slice(0, 40)
+  } else if (role === 'checkbox' || role === 'radio') {
+    item.checked = t === 'input' ? (el as HTMLInputElement).checked : el.getAttribute('aria-checked') === 'true'
+  } else {
+    const context = stepContext(el, name)
+    if (context) item.context = context
+  }
+  return item
+}
+
+function stepPage(): StepPage {
+  const items: StepPageItem[] = []
+  const groups = new Map<Element, string>()
+  let visited = 0
+  let truncated = false
+  const text = (node: Node, group: string): void => {
+    const s = clean(node.textContent, STEP_TEXT_MAX + 1)
+    if (s.length > 1 && s.length <= STEP_TEXT_MAX && /[\p{L}\p{N}]/u.test(s)) items.push({ ref: '', role: 'text', label: s, group })
+  }
+  const visit = (el: Element): void => {
+    if (truncated) return
+    if (items.length >= STEP_ITEMS_MAX || ++visited > VISIT_CAP) {
+      truncated = true
+      return
+    }
+    if (SKIP_TAGS.has(tag(el))) return
+    if (isDisplayContents(el)) {
+      for (const child of childrenOf(el)) visit(child)
+      return
+    }
+    if (!el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return
+    const role = roleOf(el)
+    const kind = role ? stepRole(el, role) : null
+    if (kind && role && isRendered(el)) {
+      const disabled = (el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true'
+      if (!disabled) {
+        const item = stepItem(el, kind, groups)
+        if (item.label || kind === 'field' || kind === 'select') items.push(item)
+      }
+      // A control's own text is its label, and a select's options are listed with it.
+      if (LEAF_ROLES.has(role) || kind === 'select') return
+    }
+    for (const node of Array.from(el.childNodes)) if (node.nodeType === Node.TEXT_NODE) text(node, '')
+    for (const child of childrenOf(el)) visit(child)
+  }
+  visit(document.body ?? document.documentElement)
+  return { items, truncated }
+}
+
 // ---- find ----
 
 const STOPWORDS = new Set(['the', 'a', 'an', 'to', 'for', 'of', 'on', 'in', 'at', 'with', 'and', 'or', 'that', 'this', 'element', 'page'])
@@ -596,6 +704,7 @@ function run(command: PageCommand): unknown {
       return el && el !== document.body ? describe(el) : null
     }
     case 'formInput': return formInput(command.ref, command.value)
+    case 'stepPage': return stepPage()
     case 'viewport': return viewport()
     case 'frame': return nextFrames(2)
   }

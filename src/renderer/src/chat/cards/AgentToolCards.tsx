@@ -4,7 +4,7 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { useState, type ReactElement } from 'react'
-import { AlertCircle, Blocks, CalendarClock, Check, ExternalLink, FilePen, Lightbulb, MessageCircle, PanelRight, Play, Square, Wand2 } from 'lucide-react'
+import { AlertCircle, Blocks, CalendarClock, Check, ChevronDown, ExternalLink, FilePen, Lightbulb, MessageCircle, PanelRight, Play, Square, Wand2 } from 'lucide-react'
 import type { RequestOutcome } from '@shared/agentTools'
 import type { RoutineSchedule } from '@shared/routines'
 import type { Routine as SavedRoutine } from '@shared/routines'
@@ -315,6 +315,45 @@ function delegationMark(status: Extract<LogItem, { kind: 'delegation' }>['status
     default:
       return <Square size={8} strokeWidth={3} />
   }
+}
+
+// ---- browser steps (atelier-step, docs/decisions.md › Browser tasks) ----
+
+/** Steps shown before "Show all": the latest ones. */
+const STEPS_SHOWN = 3
+
+export function BrowserStepsCard({ item }: LogCardProps<'browser-steps'>): ReactElement {
+  const t = useT()
+  const [all, setAll] = useState(false)
+  const tone = item.status === 'done' ? 'success' : item.status === 'failed' || item.status === 'blocked' ? 'error' : item.status === 'handed-back' ? 'needs-input' : 'neutral'
+  const status = t(`chatTools.browserSteps.status.${item.status}`)
+  const shown = all ? item.steps : item.steps.slice(-STEPS_SHOWN)
+  return (
+    <section className={cx('cd-subtask', 'cd-steps', `cd-subtask--${tone}`)} role="group" aria-label={`${t('chatTools.browserSteps.label')}: ${item.goal}, ${status}`}>
+      <p className="cd-subtask__caption">{t('chatTools.browserSteps.label')}</p>
+      <div className="cd-subtask__row">
+        <span className={cx('cd-subtask__mark', `cd-subtask__mark--${tone}`)} aria-hidden="true">
+          {item.status === 'running' ? <span className="cd-subtask__dot" /> : item.status === 'done' ? <Check size={11} strokeWidth={3} /> : item.status === 'handed-back' ? <MessageCircle size={10} strokeWidth={3} /> : item.status === 'stopped' ? <Square size={8} strokeWidth={3} /> : <AlertCircle size={11} strokeWidth={2.5} />}
+        </span>
+        <span className="cd-subtask__label">{item.goal}</span>
+        <span className="cd-subtask__status">{t('chatTools.browserSteps.count', { status, count: item.steps.length })}</span>
+      </div>
+      {shown.length > 0 && (
+        <ol className="cd-steps__list" start={item.steps.length - shown.length + 1}>
+          {shown.map((step, i) => (
+            <li key={item.steps.length - shown.length + i}>{step.text}</li>
+          ))}
+        </ol>
+      )}
+      {item.steps.length > STEPS_SHOWN && (
+        <button type="button" className="cd-steps__more" aria-expanded={all} onClick={() => setAll(!all)}>
+          <ChevronDown size={12} aria-hidden="true" className={cx(all && 'cd-steps__more--open')} />
+          {all ? t('chatTools.browserSteps.fewer') : t('chatTools.browserSteps.all', { count: item.steps.length })}
+        </button>
+      )}
+      {item.note && <p className="cd-steps__note">{item.note}</p>}
+    </section>
+  )
 }
 
 // ---- files written to watched folders ----

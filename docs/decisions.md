@@ -212,6 +212,51 @@ offers it under "New kinds of questions" once the small model is ready, and it c
   download location. `ATELIER_MINI_PARITY=<runtime folder> npx vitest run tests/decisionsDeviceMini.test.ts` checks
   that mini.ts makes the training code's token ids (608 of 608).
 
+### Browser tasks: atelier-step (an optional download)
+
+"Order the Trailrunner 2 in size 43", "fill in this form", "find me this": in each, someone has to decide on every
+page what to do next. atelier-step does that on this computer. Your companion writes the task down once (the goal,
+where to stop, the values to type) and atelier-step takes it page by page through the `browser_steps` tool.
+
+- **The model** (src/main/decisions/device/step.ts, stepFormat.ts): atelier-nano's encoder with three heads, from the
+  atelier-decisions project (step-v0.1, docs/step-model.md there). One pass per page answers the operation (click,
+  type, done, blocked), which control, and for every field which of the named values goes in. 55 MB, about a tenth
+  of a second a page on two CPU threads. It never writes text: what it types is one of the values it was given.
+  The version's calibration (step.json) is applied, so "sure" means what the cutoffs below take it to mean.
+  `ATELIER_STEP_PARITY=<model folder> npx vitest run tests/decisionsStep.test.ts` checks that this runtime makes the
+  training code's token ids and logits on the version's fixtures.
+- **Where it runs**: in the decision helper (deviceHelper.ts), as a `{ id, step }` message next to the decision
+  requests; device.ts starts a new helper when it is installed or removed. It runs without the small decision model
+  too (the helper then gets '' as the model folder and answers only steps).
+- **The download** (feature.ts, the mini's installer with `needsServer: false`): four files, 57 MB, listed in
+  `device/stepManifest.ts` with their sizes and SHA-256 and fetched from the version's tag on Hugging Face
+  (`3SENN/atelier-decisions`, `releases/step-v0.1/model/`), so the files never change under a version. Settings ›
+  Quick decisions › On this computer shows it as "Browser tasks": Download, progress, Stop, Remove.
+  `ATELIER_STEP_MODEL=<folder>` uses a folder as it is (in smoke runs too).
+- **The tool** (src/main/agent/tools/browserSteps.ts): offered to a new chat with the browser once atelier-step is
+  here, never in routines. Each page is read by the page bridge's `stepPage` (controls and short text lines in page
+  order, with their references and the form or page region each belongs to). An operation is taken at 0.6, a control
+  or a value when it is at least 0.5 and 1.5 times the next one.
+  - **Click**: through the chat's own `left_click` (AgentSession.chatBrowser), so the pause, site rules, click guard
+    and approvals are the agent's own.
+  - **Type**: into an empty field, then every other empty field of the same form or region it is sure of, through
+    `form_input`. The header's search box is never filled along with a checkout form, and password, card and
+    one-time-code fields never.
+  - **Handed back** to the companion, which carries on with its own browser tools: when it isn't sure, when no value
+    it was given fits, when the person declines a click, when it would go in circles (the same operation on the
+    same control within four), at a second add to the cart in one run, when the page stops changing, and after its
+    steps (15 by default, at most 30).
+  - **Done and blocked** end the run, and the companion is told to check the page itself: atelier-step can be wrong
+    about "done".
+- **The card**: a `browser-steps` event upserted by id while it runs ("Steps on this computer"), with the latest
+  steps and why it ended.
+- **What it is good at, measured** (the model project, step-v0.1): the kinds of flow it was trained on, in languages
+  it never saw for them, right on 97% of whole steps; on real websites it never saw, the right control 59% of the
+  time among 15-60, and calibrated it decides 28% of those and is right on 89%. In the project's lab (a shop order,
+  a product search, a two-page Dutch form) with Claude only for what it wasn't sure of, all three ended right in
+  10-18 s instead of 35-81 s. Alone it finishes none of them: it is a helper for routine stretches, never the only
+  judge.
+
 ## The rule-first contract (DC-01)
 
 Every one of Atelier's decisions calls `decider().decide({ use, rule, request, read })`
@@ -276,7 +321,9 @@ unreachable provider stops the rest, and those items say so.
 
 It is offered to a new chat while a decision model is set up and "Labeling and
 sorting in tasks" is on, and never in a private chat; the system prompt then
-has one line on when to use it. There is no Claude
+has one line on when to use it. `browser_steps` (Browser tasks, above) is the
+other decision-model tool: it runs on this computer, so private chats have it
+too. There is no Claude
 fallback on purpose: the companion is the Claude engine, so without the model
 it simply judges the items itself. What is sent is the items' text and the
 context.

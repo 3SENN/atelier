@@ -14,13 +14,14 @@ import type { FirstRunServices } from '@shared/tips'
 import { setCommandFailureCue } from '../commands'
 import { createConversationsService } from '../conversationImport/service'
 import { stubMethods } from '../serviceKit'
-import { createDockIconService } from '../dockIcon'
+import { DOCK_DESIGN_FILE, createDockIconService } from '../dockIcon'
 import type { AppContext, Feature } from '../features/types'
-import { createGuidanceService } from '../guidance'
+import { GUIDANCE_FILE, createGuidanceService } from '../guidance'
 import { createHelpService, registerHelpMenus } from '../help'
-import { SetupStore, createOnboardingService } from '../onboarding'
+import { SetupStore, createOnboardingService, setupResetStep } from '../onboarding'
+import { registerResetStep } from '../reset'
 import { UserProfileStore } from '../userProfile'
-import { createPresetMethods } from './presets'
+import { PRESET_BASES_FILE, createPresetMethods } from './presets'
 import { createGuidesService } from './service'
 import { mainLanguage, mainT } from '../i18n/mainT'
 
@@ -60,6 +61,9 @@ export function createFirstRunFeatures(): Feature {
       const activeCompanionId = (): string | undefined => deps?.companions.activeId() ?? ctx.skillRoutines?.companions.get().id
 
       const store = new SetupStore({ dataDir: ctx.dataDir, onChange: (state) => ctx.broadcast({ type: 'onboarding', state }) })
+      const profileStore = new UserProfileStore(ctx.dataDir)
+      // Reset Atelier (ST-55) restarts into setup, so setup's own files go too.
+      offs.push(registerResetStep(setupResetStep({ dataDir: ctx.dataDir, setup: store, profile: profileStore, files: [GUIDANCE_FILE, DOCK_DESIGN_FILE, PRESET_BASES_FILE] }, mainT('firstRun.reset.step'))))
       const onboarding = createOnboardingService({
         store,
         host: ctx.agent,
@@ -67,13 +71,16 @@ export function createFirstRunFeatures(): Feature {
         companionExists: (id) => (deps ? deps.companions.find(id) !== undefined : ctx.agent.companionName(id) !== null),
         // ON-18: your profile, the setup conversation and the workspace it asks for.
         profile: {
-          store: new UserProfileStore(ctx.dataDir),
+          store: profileStore,
           quick: ctx.quick,
           companionName: (id) => deps?.companions.find(id)?.name ?? ctx.agent.companionName(id),
           language: () => (mainLanguage().language === 'nl' ? 'nl' : 'en'),
           skills: () => ctx.skillRoutines?.skills.builtinNames() ?? [],
           directory: () => deps?.directory?.() ?? [],
           destinations: () => ctx.settings.get().sidebar.destinations,
+          // Your name lives in Settings › You only; the profile never keeps a second copy.
+          userName: () => ctx.settings.get().userName,
+          setUserName: (userName) => void ctx.settings.update({ userName }),
           setDestinations: (destinations) => void ctx.settings.update({ sidebar: { destinations } }),
           saveRoutine: (draft) => {
             if (!ctx.skillRoutines) throw new Error('Routines aren’t available yet.')

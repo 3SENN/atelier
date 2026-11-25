@@ -69,6 +69,8 @@ export const SETTINGS = defineSettings({
   memory: { scope: 'app', schema: z.boolean(), default: true },
   onboarded: { scope: 'app', schema: z.boolean(), default: false },
   userName: { scope: 'app', schema: z.string().trim().max(40), default: '' },
+  /** Your details (the wallet's address marked as yours, Settings › You) go into new chats' instructions, never private ones. */
+  shareDetails: { scope: 'app', schema: z.boolean(), default: true },
   userAvatar: { scope: 'app', schema: z.string().max(AVATAR_MAX).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/).nullable(), default: null },
   reduceMotion: { scope: 'app', schema: z.boolean(), default: false },
   engine: { scope: 'app', schema: z.enum(ENGINES), default: 'api-key' },
@@ -221,7 +223,8 @@ export type SettingKey = keyof typeof SETTINGS
  * The nested groups. Their schemas and defaults stay in
  * src/main/nestedSettings.ts (main registers them with the same defineSettings,
  * as NESTED_SETTINGS_REGISTRY in main/settings.ts); their scopes live here so the renderer
- * knows them too. Autofill follows the profile, like its vault (ST-06).
+ * knows them too. The autofill switches follow the profile (ST-06); the vault
+ * and wallet they fill from are shared by every profile.
  */
 export const NESTED_GROUP_SCOPES = { voice: 'app', transcription: 'app', meetingCards: 'app', autofill: 'profile' } as const satisfies Record<string, SettingScope>
 

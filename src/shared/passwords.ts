@@ -98,6 +98,8 @@ export interface AddressView extends AddressInput {
   /** A one-line label, for example "Sam Lee, 1 Main St". */
   label: string
   updatedAt: number
+  /** Your own details (Settings › You): at most one address is yours, and autofill and your companion use it first. */
+  mine: boolean
 }
 
 export type CardBrand = 'visa' | 'mastercard' | 'amex' | 'discover' | 'diners' | 'jcb' | 'unionpay' | 'maestro' | 'unknown'
@@ -150,7 +152,9 @@ export interface PasswordsServices {
   }
   wallet: {
     addresses(): AddressView[]
-    saveAddress(a: AddressInput & { id?: string }): AddressView
+    saveAddress(a: AddressInput & { id?: string; mine?: boolean }): AddressView
+    /** Marks a saved address as yours, or none (null). */
+    setMine(id: string | null): void
     removeAddress(id: string): void
     cards(): CardView[]
     saveCard(c: CardInput): CardView

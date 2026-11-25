@@ -159,6 +159,7 @@ export const firstRun = {
   'firstRun.mainFeature.chooseAConversationsJson': 'Choose a conversations.json, a .zip export, or {brand} chat exports (.md).',
   'firstRun.mainFeature.chooseConversationExports': 'Choose conversation exports',
   'firstRun.mainFeature.conversationExports': 'Conversation exports',
+  'firstRun.reset.step': 'Setup progress, About you, dismissed tips and your Dock icon design',
   'firstRun.mainFirstWeek.yourGettingStartedProgress': 'Your getting-started progress couldn’t be read, so it has started over.',
   'firstRun.mainFirstWeek.yourGettingStartedProgress2': 'Your getting-started progress was saved by a newer version of {brand}, so it has started over here.',
   'firstRun.mainFirstWeek.yourGettingStartedProgress3': 'Your getting-started progress was damaged, so it has started over.',

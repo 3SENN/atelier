@@ -45,6 +45,7 @@ import { RoutineRunner, lastReplyOf } from './routines'
 import { SERVICE_SCHEMAS, registerServices } from './services'
 import { SettingsStore, WindowStateStore } from './settings'
 import { agentOverlayLook, setupShell } from './shell'
+import { personDetails } from './agent/details'
 import { createAppQuickModel, createPersonalWiring } from './personalWiring'
 // The HUD previews replies from the same chat events the chrome gets
 import { voiceChatTap } from './voice/chatTap'
@@ -369,6 +370,14 @@ void app.whenReady().then(async () => {
     presets,
     ...(smokeClient ? { client: smokeClient.client } : {}),
     backends: engines.backends,
+    // Settings › You: the saved address marked as yours, read when a chat starts (the wallet is there by then).
+    details: () => {
+      try {
+        return personDetails(personalWiring.context.personal.wallet.mine())
+      } catch {
+        return null
+      }
+    },
     emit: (envelope) => {
       if (!window.isDestroyed()) window.webContents.send(UI.agentEvent, envelope)
       voiceChatTap.event(envelope)

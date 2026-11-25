@@ -409,7 +409,7 @@ describe('cards and addresses (OV-29)', () => {
 
   it('fills addresses after auth and offers to save a complete one', async () => {
     const h = harness('https://shop.example/address')
-    h.wallet.addressList = [{ id: 'a1', label: 'Robin Vos, Kade 1', updatedAt: 0, givenName: 'Robin', additionalName: '', familyName: 'Vos', organization: '', line1: 'Kade 1', line2: '', line3: '', city: 'Gent', region: '', postalCode: '9000', country: 'BE', email: '', tel: '' }]
+    h.wallet.addressList = [{ id: 'a1', label: 'Robin Vos, Kade 1', updatedAt: 0, givenName: 'Robin', additionalName: '', familyName: 'Vos', organization: '', line1: 'Kade 1', line2: '', line3: '', city: 'Gent', region: '', postalCode: '9000', country: 'BE', email: '', tel: '', mine: false }]
     h.controller.onReport(h.top, focus('address-line1', 'address'))
     await flush()
     const popup = h.presenter.shown[0]

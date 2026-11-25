@@ -37,9 +37,9 @@ export interface ProfileManager {
   get(id: string): Profile | null
   /** Records a window's profile (windowContext does this for every window it builds). */
   attachWindow(win: BrowserWindow, profileId: string): void
-  /** One instance per profile of a per-profile store (history, pinned tabs, the vault…), made on first use in the profile's data folder. */
+  /** One instance per profile of a per-profile store (history, pinned tabs, bookmarks, downloads…), made on first use in the profile's data folder. */
   store<T>(id: string, name: string, create: (dataDir: string) => T): T
-  /** Counts only another feature knows (saved logins), added to the deletion summary. */
+  /** Counts only another feature knows (the chats or companions a profile owns), added to the deletion summary. */
   addSummarySource(source: (id: string) => Partial<ProfileDeletionSummary>): () => void
   /** Runs before a profile's data goes (stop its work, close its stores). */
   onRemoving(cb: (id: string) => void | Promise<void>): () => void

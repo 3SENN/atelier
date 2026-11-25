@@ -51,7 +51,7 @@ export function historyFileCount(dataDir: string): number {
   }
 }
 
-export const EMPTY_SUMMARY: ProfileDeletionSummary = { tabs: 0, historyEntries: 0, logins: 0, siteDataBytes: 0, ownedChats: 0, ownedCompanions: 0 }
+export const EMPTY_SUMMARY: ProfileDeletionSummary = { tabs: 0, historyEntries: 0, siteDataBytes: 0, ownedChats: 0, ownedCompanions: 0 }
 
 /** Adds counts from several sources; negative or non-finite numbers count as 0. */
 export function sumSummaries(parts: readonly Partial<ProfileDeletionSummary>[]): ProfileDeletionSummary {

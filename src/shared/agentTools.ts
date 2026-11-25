@@ -141,6 +141,8 @@ export type AgentToolsEvent =
   | { type: 'app-built'; requestId: string; appId: string; versionId: string; name: string }
   | { type: 'source'; url: string; title: string }
   | { type: 'file-written'; turnId: string; ref: FileRef; name: string }
+  /** browser_steps (docs/decisions.md › Browser tasks): the steps atelier-step took, upserted by id while it runs. */
+  | import('./browserSteps').BrowserStepsCard
   /** propose_pack (docs/packs.md): a draft ready for the person to review; the card opens the review, nothing waits on it. */
   | { type: 'pack-proposed'; id: string; packId: string; name: string; version: string; note: string; permissions: import('./packs').PackPermissionLine[] }
 

@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import { DEVICE_SCHEME } from '@shared/decisions'
 import type { FetchLike } from './client'
 import { MINI_FILES, miniServer } from './device/miniFiles'
+import { STEP_FILES, type StepAnswer } from './device/step'
+import type { StepInput } from './device/stepFormat'
 import { log } from '../log'
 
 // The on-device decision model's main side (docs/decisions.md › On this device). Atelier's own small
@@ -35,6 +37,11 @@ export function deviceMiniDir(dir: string, platform: NodeJS.Platform = process.p
   return MINI_FILES.every((f) => existsSync(join(dir, f))) && existsSync(miniServer(dir, platform)) ? dir : null
 }
 
+/** atelier-step's folder (an optional download, deviceStep.ts) when its files are all here, else null. */
+export function deviceStepDir(dir: string): string | null {
+  return STEP_FILES.every((f) => existsSync(join(dir, f))) ? dir : null
+}
+
 /** What the helper sends back: one reply per request id, and the mini's server once it runs. */
 type HelperReply = { id: number; type: 'result'; reply: unknown } | { id: number; type: 'error'; message: string } | { type: 'server'; pid: number }
 
@@ -45,8 +52,9 @@ export interface DeviceProcess {
   kill(): boolean | void
 }
 
-/** Starts the helper: Electron's utility process in the app, anything with the same shape in tests. */
-export type DeviceSpawner = (modelDir: string, miniDir: string | null) => DeviceProcess
+/** Starts the helper: Electron's utility process in the app, anything with the same shape in tests. modelDir is ''
+ *  when only atelier-step is here (it answers browser steps, and decisions read the model as not installed). */
+export type DeviceSpawner = (modelDir: string, miniDir: string | null, stepDir: string | null) => DeviceProcess
 
 const TIMEOUT_MS = 10_000
 /** With the mini: loading it takes a few seconds cold, and a request of many questions a few tenths each. Callers' own timeouts are shorter for most decisions. */
@@ -66,6 +74,8 @@ export interface DeviceDecisionsOptions {
   modelDir(): string | null
   /** The mini's folder (deviceMiniDir), read on each start (null or absent: not installed, the small model alone). */
   miniDir?(): string | null
+  /** atelier-step's folder (deviceStepDir), read on each start (null or absent: browser steps are not available). */
+  stepDir?(): string | null
   spawner: DeviceSpawner
   idleMs?: number
   /** Stops the mini's server (default process.kill). */
@@ -77,6 +87,8 @@ export class DeviceDecisions {
   #proc: DeviceProcess | null = null
   /** The mini's folder the running helper was started with. */
   #procMini: string | null = null
+  /** atelier-step's folder the running helper was started with. */
+  #procStep: string | null = null
   /** The mini's server, started by the helper. */
   #server: number | null = null
   #nextId = 1
@@ -122,6 +134,17 @@ export class DeviceDecisions {
     }
   }
 
+  /** atelier-step is here and the helper hasn't kept crashing. */
+  stepAvailable(): boolean {
+    return this.#crashes < CRASHES_MAX && (this.#opts.stepDir?.() ?? null) !== null
+  }
+
+  /** One page of a browser task, answered by atelier-step (docs/decisions.md › Browser tasks). */
+  async step(input: StepInput, signal: AbortSignal): Promise<StepAnswer> {
+    if (!this.stepAvailable()) throw new Error('atelier-step is not installed.')
+    return (await this.#request({ step: input }, signal)) as StepAnswer
+  }
+
   /** Loads the small model ahead of the first question (it takes up to a second cold), so that one is answered in time too. The mini loads on its first question, not here: it needs up to 2 GB of memory. */
   warm(): void {
     if (!this.available()) return
@@ -137,7 +160,7 @@ export class DeviceDecisions {
     this.#stop()
   }
 
-  #request(request: { state: unknown; questions: unknown }, signal: AbortSignal, nanoOnly = false): Promise<unknown> {
+  #request(request: { state: unknown; questions: unknown } | { step: StepInput }, signal: AbortSignal, nanoOnly = false): Promise<unknown> {
     if (signal.aborted) return Promise.reject(new Error('The decision was stopped.'))
     const proc = this.#ensure()
     if (!proc) return Promise.reject(new Error('The on-device decision model is not available.'))
@@ -167,7 +190,7 @@ export class DeviceDecisions {
           cancel()
           reject(new Error('The on-device decision model took too long.'))
         },
-        this.#procMini ? MINI_TIMEOUT_MS : TIMEOUT_MS,
+        this.#procMini && !('step' in request) ? MINI_TIMEOUT_MS : TIMEOUT_MS,
       )
       signal.addEventListener('abort', onAbort, { once: true })
       this.#pending.set(id, {
@@ -182,7 +205,7 @@ export class DeviceDecisions {
         timer,
       })
       try {
-        proc.postMessage(nanoOnly ? { id, request, nanoOnly } : { id, request })
+        proc.postMessage('step' in request ? { id, step: request.step } : nanoOnly ? { id, request, nanoOnly } : { id, request })
       } catch (err) {
         done()
         reject(err instanceof Error ? err : new Error(String(err)))
@@ -193,14 +216,15 @@ export class DeviceDecisions {
 
   #ensure(): DeviceProcess | null {
     const mini = this.#opts.miniDir?.() ?? null
-    // The mini was installed or removed since the helper started: a new one picks that up, once nothing is waiting on this one.
-    if (this.#proc && mini !== this.#procMini && this.#pending.size === 0) this.#stop()
+    const step = this.#opts.stepDir?.() ?? null
+    // The mini or atelier-step was installed or removed since the helper started: a new one picks that up, once nothing is waiting on this one.
+    if (this.#proc && (mini !== this.#procMini || step !== this.#procStep) && this.#pending.size === 0) this.#stop()
     if (this.#proc) return this.#proc
     const dir = this.#opts.modelDir()
-    if (!dir || this.#crashes >= CRASHES_MAX) return null
+    if ((!dir && !step) || this.#crashes >= CRASHES_MAX) return null
     let proc: DeviceProcess
     try {
-      proc = this.#opts.spawner(dir, mini)
+      proc = this.#opts.spawner(dir ?? '', mini, step)
     } catch (err) {
       log.warn('decisions', 'Could not start the on-device decision model', { error: err instanceof Error ? err.message : String(err) })
       this.#crashes = CRASHES_MAX
@@ -208,12 +232,14 @@ export class DeviceDecisions {
     }
     this.#proc = proc
     this.#procMini = mini
+    this.#procStep = step
     proc.on('message', (message) => this.#read(message))
     proc.once('exit', () => {
       if (this.#proc !== proc) return
       const hadWork = this.#pending.size > 0
       this.#proc = null
       this.#procMini = null
+      this.#procStep = null
       this.#killServer()
       if (hadWork) this.#crashes++
       for (const [, p] of this.#pending) p.reject(new Error('The on-device decision model stopped.'))
@@ -252,6 +278,7 @@ export class DeviceDecisions {
     const proc = this.#proc
     this.#proc = null
     this.#procMini = null
+    this.#procStep = null
     for (const [, p] of this.#pending) p.reject(new Error('The on-device decision model was stopped.'))
     this.#pending.clear()
     try {
@@ -273,6 +300,15 @@ export class DeviceDecisions {
       // Already gone.
     }
   }
+}
+
+let current: DeviceDecisions | null = null
+/** The running on-device models, for the browser-steps tool (agent/tools/browserSteps.ts); null before start and after quit. */
+export function deviceSteps(): DeviceDecisions | null {
+  return current
+}
+export function setDeviceSteps(device: DeviceDecisions | null): void {
+  current = device
 }
 
 /** A request the model can't take (no questions, a malformed question): the client reads it as a bad request. */

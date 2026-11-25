@@ -24,7 +24,7 @@ import {
 } from '@shared/passwords'
 import { call, errorText } from '../api'
 import { Field, TextInput } from '../settings/kit'
-import { Button, Dialog, Select } from '../ui'
+import { Button, Dialog, Select, Switch } from '../ui'
 import { useT, type MessageKey } from '../i18n/useT'
 
 const NAME_FIELDS: Array<{ key: keyof AddressInput; label: MessageKey; autoComplete: string }> = [
@@ -45,10 +45,12 @@ const PLACE_FIELDS: Array<{ key: keyof AddressInput; label: MessageKey }> = [
   { key: 'postalCode', label: 'passwords.address.postalCode' },
 ]
 
-export function AddressDialog({ open, editing, onClose, onSaved }: { open: boolean; editing: AddressView | null; onClose(): void; onSaved(view: AddressView): void }): ReactElement {
+/** `mine`: a new address starts as your own details (Settings › You); an edited one keeps what it is unless you change it. */
+export function AddressDialog({ open, editing, mine = false, onClose, onSaved }: { open: boolean; editing: AddressView | null; mine?: boolean; onClose(): void; onSaved(view: AddressView): void }): ReactElement {
   const t = useT()
   const ids = useId()
   const [form, setForm] = useState<AddressInput>(EMPTY_ADDRESS)
+  const [isMine, setMine] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const countries = useMemo(() => [{ value: '', label: t('passwords.address.noCountry') }, ...countryOptions()], [])
@@ -56,10 +58,12 @@ export function AddressDialog({ open, editing, onClose, onSaved }: { open: boole
   useEffect(() => {
     if (!open) return
     if (editing) {
-      const { id: _id, label: _label, updatedAt: _updatedAt, ...fields } = editing
+      const { id: _id, label: _label, updatedAt: _updatedAt, mine: wasMine, ...fields } = editing
       setForm(fields)
+      setMine(wasMine)
     } else {
       setForm({ ...EMPTY_ADDRESS, country: defaultCountry() })
+      setMine(mine)
     }
     setBusy(false)
     setError(null)
@@ -73,7 +77,7 @@ export function AddressDialog({ open, editing, onClose, onSaved }: { open: boole
     setBusy(true)
     setError(null)
     try {
-      onSaved(await call('wallet', 'saveAddress', editing ? { ...form, id: editing.id } : form))
+      onSaved(await call('wallet', 'saveAddress', { ...form, mine: isMine, ...(editing ? { id: editing.id } : {}) }))
     } catch (err) {
       setError(errorText(err))
       setBusy(false)
@@ -116,6 +120,7 @@ export function AddressDialog({ open, editing, onClose, onSaved }: { open: boole
           {input('email', 'passwords.address.email', { type: 'email' })}
           {input('tel', 'passwords.address.tel', { type: 'tel' })}
         </div>
+        <Switch label={t('passwords.address.mine')} description={t('passwords.address.mine.description')} checked={isMine} onChange={setMine} />
         {error && (
           <p className="pw-form__error" role="alert">
             {error}

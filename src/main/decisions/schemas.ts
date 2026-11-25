@@ -28,5 +28,8 @@ export const DECISIONS_SCHEMAS: {
     installMini: z.tuple([]),
     cancelMini: z.tuple([]),
     removeMini: z.tuple([]),
+    installStep: z.tuple([]),
+    cancelStep: z.tuple([]),
+    removeStep: z.tuple([]),
   },
 }

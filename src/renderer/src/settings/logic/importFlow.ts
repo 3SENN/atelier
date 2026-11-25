@@ -13,6 +13,7 @@ export const IMPORT_TYPE_LABELS: Record<ImportType, MessageKey> = {
   history: 'settings.import.type.history',
   tabs: 'settings.import.type.tabs',
   searchEngines: 'settings.import.type.searchEngines',
+  addresses: 'settings.import.type.addresses',
   cookies: 'settings.import.type.cookies',
 }
 
@@ -21,6 +22,7 @@ export const IMPORT_COUNT_LABELS: Record<ImportType, MessageKey> = {
   history: 'settings.import.count.history',
   tabs: 'settings.import.count.tabs',
   searchEngines: 'settings.import.count.searchEngines',
+  addresses: 'settings.import.count.addresses',
   cookies: 'settings.import.count.cookies',
 }
 

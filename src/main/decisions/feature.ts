@@ -15,8 +15,9 @@ import { registerResetStep } from '../reset'
 import { appRoot } from '../resources'
 import { registerStorageCategory } from '../storage'
 import type { FetchLike } from './client'
-import { DeviceDecisions, deviceModelDir } from './device'
+import { DeviceDecisions, deviceModelDir, deviceStepDir, setDeviceSteps } from './device'
 import { MINI_MANIFEST } from './device/miniManifest'
+import { STEP_MANIFEST } from './device/stepManifest'
 import { MiniInstaller } from './deviceMini'
 import { DecisionKeys, KEYS_FILE } from './keys'
 import { COMPARISONS_FILE, Decisions, setDecider } from './service'
@@ -165,12 +166,16 @@ export function createDecisionsFeature(): Feature {
       })
       // Atelier's own decision model, in a utility process that starts on the first question (device.ts).
       // Its larger half, atelier-mini, is an optional download (deviceMini.ts); ATELIER_DECISION_MINI uses a folder as it is.
+      // atelier-step, the model for browser tasks (docs/decisions.md › Browser tasks), is another optional download that
+      // runs in the same helper; ATELIER_STEP_MODEL uses a folder as it is (in smoke runs too, so the tool can be checked).
       let mini: MiniInstaller | null = null
+      let stepInstaller: MiniInstaller | null = null
       const device = new DeviceDecisions({
         modelDir: () => (app.smoke ? null : deviceModelDir({ packaged: electronApp.isPackaged, resourcesPath: process.resourcesPath, appPath: appRoot() })),
         miniDir: () => (app.smoke ? null : (mini?.dir() ?? null)),
-        spawner: (dir, miniDir) =>
-          utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), miniDir ? [dir, miniDir] : [dir], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
+        stepDir: () => stepInstaller?.dir() ?? null,
+        spawner: (dir, miniDir, stepDir) =>
+          utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), [dir, miniDir ?? '', stepDir ?? ''], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
       })
       const installer = new MiniInstaller({
         dir: process.env.ATELIER_DECISION_MINI || join(app.dataDir, 'decision-model-mini'),
@@ -185,8 +190,25 @@ export function createDecisionsFeature(): Feature {
         release: () => device.restart(),
       })
       mini = installer
+      const stepFolder = process.env.ATELIER_STEP_MODEL
+      const steps = new MiniInstaller({
+        dir: stepFolder || join(app.dataDir, 'decision-model-step'),
+        manifest: STEP_MANIFEST,
+        needsServer: false,
+        installed: deviceStepDir,
+        external: Boolean(stepFolder) || app.smoke,
+        download: async (url, init) => {
+          const res = await net.fetch(url, { signal: init.signal, headers: init.headers })
+          return { status: res.status, body: res.body as AsyncIterable<Uint8Array> | null }
+        },
+        release: () => device.restart(),
+      })
+      stepInstaller = steps
+      setDeviceSteps(device)
       stops.push(() => {
         installer.cancel()
+        steps.cancel()
+        setDeviceSteps(null)
         device.dispose()
       })
       const d = new Decisions({
@@ -198,6 +220,7 @@ export function createDecisionsFeature(): Feature {
         quick: () => app.quick ?? null,
         device,
         mini: installer,
+        step: steps,
       })
       decider = d
       setDecider(d)
@@ -273,6 +296,18 @@ export function createDecisionsFeature(): Feature {
         },
         removeMini: async () => {
           installer.remove()
+          return d.status()
+        },
+        installStep: async () => {
+          void steps.install().then(() => log.info('decisions', 'atelier-step download ended', { status: steps.status().state }))
+          return d.status()
+        },
+        cancelStep: async () => {
+          steps.cancel()
+          return d.status()
+        },
+        removeStep: async () => {
+          steps.remove()
           return d.status()
         },
         openKeyPage: (provider) => {

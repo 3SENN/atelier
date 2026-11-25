@@ -164,7 +164,8 @@ export function ImportSection({ compact = false, browser: wanted = null }: Impor
                 {chosen.types.map((type) => (
                   <Fragment key={type}>
                     <CheckRow label={t(IMPORT_TYPE_LABELS[type])} checked={types.includes(type)} onChange={(on) => setTypes((cur) => toggleType(cur, type, on, chosen.types))} />
-                    {type === 'cookies' && <p className="sp-import__cookies-note sp-field__hint">{t('settings.import.cookies.explain')}</p>}
+                    {type === 'addresses' && <p className="sp-import__type-note sp-field__hint">{t('settings.import.addresses.explain')}</p>}
+                    {type === 'cookies' && <p className="sp-import__type-note sp-field__hint">{t('settings.import.cookies.explain')}</p>}
                   </Fragment>
                 ))}
                 {chosen.extensions && profileId && (

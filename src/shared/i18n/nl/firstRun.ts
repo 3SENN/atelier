@@ -159,6 +159,7 @@ export const firstRun = {
   'firstRun.mainFeature.chooseAConversationsJson': 'Kies een conversations.json, een .zip-export of {brand}-chatexports (.md).',
   'firstRun.mainFeature.chooseConversationExports': 'Kies gespreksexports',
   'firstRun.mainFeature.conversationExports': 'Gespreksexports',
+  'firstRun.reset.step': 'Voortgang van de installatie, Over jou, gesloten tips en je ontwerp voor het Dock-icoon',
   'firstRun.mainFirstWeek.yourGettingStartedProgress': 'Je voortgang bij Aan de slag kon niet worden gelezen, dus die is opnieuw begonnen.',
   'firstRun.mainFirstWeek.yourGettingStartedProgress2': 'Je voortgang bij Aan de slag is bewaard door een nieuwere versie van {brand}, dus die is hier opnieuw begonnen.',
   'firstRun.mainFirstWeek.yourGettingStartedProgress3': 'Je voortgang bij Aan de slag was beschadigd, dus die is opnieuw begonnen.',

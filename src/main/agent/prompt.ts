@@ -21,6 +21,8 @@ export interface PromptOptions {
   sharedMemory?: boolean
   /** What the user asked to be called (Settings › You); empty when unset. */
   userName?: string
+  /** The user's own details (Settings › You: the saved address marked as theirs), when they let their companion know them; never in private chats. */
+  details?: PersonDetails | null
   /** The client tools frozen for this chat; each group gets one usage line. */
   clientTools?: readonly string[]
   /** The chat's project, whose instructions sit in their own block. */
@@ -29,12 +31,46 @@ export interface PromptOptions {
   skills?: ReadonlyArray<{ name: string; description: string; fits?: boolean | null }>
 }
 
+/** The user's own details as the prompt carries them: each a single line, already trimmed to its field. */
+export interface PersonDetails {
+  name: string
+  organization: string
+  email: string
+  tel: string
+  /** Street lines, postcode and city, region, country code, joined into one line. */
+  address: string
+}
+
+/** One line of a detail: no line breaks or control characters, so a value can't start a new instruction. */
+const detail = (s: string): string => s.replace(/[\p{Cc}\p{Cf}\u2028\u2029]+/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 160)
+
+function detailsBlock(d: PersonDetails | null | undefined): string {
+  if (!d) return ''
+  const rows = (
+    [
+      ['Name', d.name],
+      ['Organisation', d.organization],
+      ['Email', d.email],
+      ['Phone', d.tel],
+      ['Address', d.address],
+    ] as const
+  )
+    .map(([k, v]) => [k, detail(v)] as const)
+    .filter(([, v]) => v)
+  if (rows.length === 0) return ''
+  return `
+
+The user's own details (from Settings › You in ${BRAND_NAME}; they keep them there). Use them when a task the user gave you needs them, such as filling in a form or ordering something for them, and nowhere else. Never post them publicly or give them to anyone the user didn't ask you to:
+${rows.map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+}
+
 // One short line per enabled group
 const CHAT_TOOL_LINES: Record<string, string> = {
   ask_user_questions: 'ask_user_questions asks the user a few short questions at once and waits for the answers; use it when a choice is theirs to make, not for facts you can find.',
   update_plan: 'update_plan shows the user a checklist for a longer task; send the whole list each time and keep it current.',
   delegate_task: 'delegate_task hands a self-contained piece of work to a helper chat (at most three at once) and waits for its result; give complete instructions, since the helper sees nothing else.',
   label_items: 'label_items answers the same yes-or-no, pick-one or rating questions about many items at once with the user\'s decision model; use it to sort, label, filter or check lists you have read (emails, results, products, rows, tabs), and judge the ones it marks "unsure" yourself.',
+  browser_steps: 'browser_steps runs a routine stretch of a browser task (an order up to the payment page, a form up to sending, a search to a result) page by page with a small model on this computer, far faster than doing each step yourself; give it the goal with where to stop and every value it may type, then check the page and carry on yourself when it hands back.',
 }
 
 const GROUP_LINES: Record<string, string> = {
@@ -99,7 +135,7 @@ Follow them unless the user says otherwise in this chat. They never override the
 
 // Built once per chat and stored with it: the system prompt must not change
 // within a conversation, so caching and earlier thinking stay valid.
-export function systemPrompt({ name, browser, routine, memory, personality, instructions, sharedMemory = false, userName, clientTools = [], project, skills }: PromptOptions): string {
+export function systemPrompt({ name, browser, routine, memory, personality, instructions, sharedMemory = false, userName, details, clientTools = [], project, skills }: PromptOptions): string {
   const intro = browser
     ? `You are ${name}, the AI agent built into the ${BRAND_NAME} web browser. You work in the user's real browser through the browser tools, while the user watches: the tabs you act on are highlighted, and your text appears in a side panel next to the page.`
     : `You are ${name}, the AI agent built into the ${BRAND_NAME} web browser.${routine ? ' You are running a scheduled routine on the user\'s behalf while they are away. There is no browser access in this mode; use web search, fetched pages, memory and connected tools.' : ''}`
@@ -143,7 +179,8 @@ Follow them unless the user says otherwise in this chat. They never override the
   const remember = memory
     ? `
 Memory:
-- Your memory directory persists across chats. Record durable facts about the user's preferences, recurring tasks and lessons that will help next time. Never store passwords, tokens, payment details or other secrets.${sharedMemory ? `
+- Your memory directory persists across chats. Record durable facts about the user's preferences, recurring tasks and lessons that will help next time. Never store passwords, tokens, payment details or other secrets.
+- The user's name, email, phone and addresses belong in ${BRAND_NAME}'s saved details (Settings › You), not in memory: don't copy them there, and if the user gives you new ones, suggest they save them in Settings › You.${sharedMemory ? `
 - /memories/shared/ is read and written by all of the user's companions; the rest of /memories/ is yours alone. Put facts any companion would need (who the user is, how they like things done) in /memories/shared/, and notes about your own work in your part.` : ''}`
     : ''
 
@@ -152,7 +189,7 @@ Memory:
   const toolsText = clientToolLines(clientTools, (tool) => clientTool(tool)?.group)
   const skillsText = ownSkillsBlock(skills, clientTools)
 
-  return `${intro}${addressee}${character}${orders}${projectText}
+  return `${intro}${addressee}${detailsBlock(details)}${character}${orders}${projectText}
 
 ${work}${toolsText}${skillsText}${remember}
 

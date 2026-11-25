@@ -65,16 +65,16 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
   const d = settings.decisions
   // Both keep what they show while they reload, so a change never empties the page or loses its place.
   const status = useResource(() => call('decisions', 'status'), JSON.stringify([d.on, d.models, d.servers]), { keep: true })
-  // While atelier-mini downloads, its progress comes with the status: ask again each second.
-  const miniDownloading = status.data?.mini?.state === 'downloading'
+  // While atelier-mini or atelier-step downloads, its progress comes with the status: ask again each second.
+  const downloading = status.data?.mini?.state === 'downloading' || status.data?.step?.state === 'downloading'
   useEffect(() => {
-    if (!miniDownloading) return
+    if (!downloading) return
     const timer = setInterval(() => void status.reload(), 1_000)
     return () => clearInterval(timer)
-  }, [miniDownloading]) // eslint-disable-line react-hooks/exhaustive-deps
-  const miniAction = async (action: 'install' | 'cancel' | 'remove'): Promise<void> => {
+  }, [downloading]) // eslint-disable-line react-hooks/exhaustive-deps
+  const downloadAction = async (which: 'Mini' | 'Step', action: DownloadAction): Promise<void> => {
     try {
-      status.set(await call('decisions', action === 'install' ? 'installMini' : action === 'cancel' ? 'cancelMini' : 'removeMini'))
+      status.set(await call('decisions', `${action}${which}` as `install${'Mini' | 'Step'}`))
     } catch (err) {
       toast.show({ tone: 'error', message: errorText(err) })
     }
@@ -237,7 +237,9 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
                 inUse={d.models.some((m) => m.provider === id)}
                 onUse={() => addModel({ provider: id, model: PROVIDER_DEFAULTS[id].suggested })}
                 mini={status.data?.mini}
-                onMini={(action) => void miniAction(action)}
+                onMini={(action) => void downloadAction('Mini', action)}
+                step={status.data?.step}
+                onStep={(action) => void downloadAction('Step', action)}
               />
             ) : (
               <PresetRow key={id} id={id} hasKey={status.data?.keys[id] ?? false} onSave={(key) => saveKey(id, key)} onDisconnect={() => void disconnect(id)} />
@@ -420,7 +422,45 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
   )
 }
 
-/** Atelier's own model on this computer: no key to connect, only whether its files are here and whether you use it; and its optional larger half, atelier-mini, to download or remove. */
+type DownloadAction = 'install' | 'cancel' | 'remove'
+
+/** One of the on-device models' optional downloads: what it does, and download, stop or remove. */
+function DownloadRow({ anchor, name, description, state, onAction }: { anchor: string; name: string; description: string; state: MiniStatus; onAction(action: DownloadAction): void }): ReactElement {
+  const t = useT()
+  const mb = (bytes: number): string => String(Math.round(bytes / 1e6))
+  return (
+    <div className="dc-provider" data-settings-anchor={anchor}>
+      <div className="dc-provider__text">
+        <span className="sp-field__label">
+          {name}{' '}
+          {state.state === 'ready' && <Badge tone="success">{t('decisions.device.mini.ready')}</Badge>}
+          {state.state === 'downloading' && <Badge tone="info">{t('decisions.device.mini.downloading', { received: mb(state.received), total: mb(state.total) })}</Badge>}
+        </span>
+        <span className="sp-field__hint">{description}</span>
+        {state.state === 'failed' && <p className="sp-field__error">{t('decisions.device.mini.failed', { error: state.error })}</p>}
+      </div>
+      <div className="dc-provider__actions">
+        {(state.state === 'absent' || state.state === 'failed') && (
+          <Button size="sm" variant="secondary" onClick={() => onAction('install')}>
+            {t('decisions.device.mini.download', { size: mb(state.total) })}
+          </Button>
+        )}
+        {state.state === 'downloading' && (
+          <Button size="sm" variant="ghost" onClick={() => onAction('cancel')}>
+            {t('decisions.device.mini.cancel')}
+          </Button>
+        )}
+        {state.state === 'ready' && !state.external && (
+          <Button size="sm" variant="ghost" onClick={() => onAction('remove')}>
+            {t('decisions.device.mini.remove')}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Atelier's own model on this computer: no key to connect, only whether its files are here and whether you use it; its optional larger half, atelier-mini, and atelier-step for browser tasks, to download or remove. */
 function DeviceRow({
   id,
   installed,
@@ -428,16 +468,19 @@ function DeviceRow({
   onUse,
   mini,
   onMini,
+  step,
+  onStep,
 }: {
   id: DecisionPresetId
   installed: boolean
   inUse: boolean
   onUse(): void
   mini?: MiniStatus
-  onMini(action: 'install' | 'cancel' | 'remove'): void
+  onMini(action: DownloadAction): void
+  step?: MiniStatus
+  onStep(action: DownloadAction): void
 }): ReactElement {
   const t = useT()
-  const mb = (bytes: number): string => String(Math.round(bytes / 1e6))
   return (
     <div className="sp-row sp-row--stack" data-settings-anchor={`decisions-provider-${id}`}>
       <div className="dc-provider">
@@ -456,34 +499,10 @@ function DeviceRow({
         </div>
       </div>
       {installed && mini && mini.state !== 'unavailable' && (
-        <div className="dc-provider" data-settings-anchor="decisions-device-mini">
-          <div className="dc-provider__text">
-            <span className="sp-field__label">
-              {t('decisions.device.mini')}{' '}
-              {mini.state === 'ready' && <Badge tone="success">{t('decisions.device.mini.ready')}</Badge>}
-              {mini.state === 'downloading' && <Badge tone="info">{t('decisions.device.mini.downloading', { received: mb(mini.received), total: mb(mini.total) })}</Badge>}
-            </span>
-            <span className="sp-field__hint">{t('decisions.device.mini.description')}</span>
-            {mini.state === 'failed' && <p className="sp-field__error">{t('decisions.device.mini.failed', { error: mini.error })}</p>}
-          </div>
-          <div className="dc-provider__actions">
-            {(mini.state === 'absent' || mini.state === 'failed') && (
-              <Button size="sm" variant="secondary" onClick={() => onMini('install')}>
-                {t('decisions.device.mini.download', { size: mb(mini.total) })}
-              </Button>
-            )}
-            {mini.state === 'downloading' && (
-              <Button size="sm" variant="ghost" onClick={() => onMini('cancel')}>
-                {t('decisions.device.mini.cancel')}
-              </Button>
-            )}
-            {mini.state === 'ready' && !mini.external && (
-              <Button size="sm" variant="ghost" onClick={() => onMini('remove')}>
-                {t('decisions.device.mini.remove')}
-              </Button>
-            )}
-          </div>
-        </div>
+        <DownloadRow anchor="decisions-device-mini" name={t('decisions.device.mini')} description={t('decisions.device.mini.description')} state={mini} onAction={onMini} />
+      )}
+      {step && step.state !== 'unavailable' && (
+        <DownloadRow anchor="decisions-device-step" name={t('decisions.device.step')} description={t('decisions.device.step.description')} state={step} onAction={onStep} />
       )}
     </div>
   )

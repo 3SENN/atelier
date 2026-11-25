@@ -100,6 +100,51 @@ describe('addresses', () => {
   })
 })
 
+describe('your own address', () => {
+  const robin = { ...EMPTY_ADDRESS, givenName: 'Robin', familyName: 'Vos', line1: 'Kade 1', city: 'Gent', postalCode: '9000', country: 'BE' }
+
+  it('marks one address as yours, lists it first and clears it when removed', () => {
+    const w = walletAt()
+    const mine = w.saveAddress({ ...robin, mine: true })
+    const other = w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Sam', familyName: 'Lee', line1: 'Main St 1' })
+    expect(w.mine()?.id).toBe(mine.id)
+    expect(w.addresses().map((a) => [a.id, a.mine])).toEqual([[mine.id, true], [other.id, false]])
+    w.setMine(other.id)
+    expect(w.mine()?.id).toBe(other.id)
+    expect(() => w.setMine('00000000-0000-4000-8000-000000000000')).toThrow()
+    w.removeAddress(other.id)
+    expect(w.mine()).toBeNull()
+    w.setMine(mine.id)
+    w.saveAddress({ ...robin, id: mine.id, mine: false })
+    expect(w.mine()).toBeNull()
+  })
+
+  it('keeps which address is yours across reopening, and reads older wallets without it', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'atelier-wallet-'))
+    const mine = walletAt(dir).saveAddress({ ...robin, mine: true })
+    expect(walletAt(dir).mine()?.id).toBe(mine.id)
+    walletAt(dir).wipe()
+    expect(walletAt(dir).mine()).toBeNull()
+  })
+
+  it('fills in a saved address instead of adding a near-copy', () => {
+    const w = walletAt()
+    const first = w.saveAddress({ ...robin, mine: true })
+    // The same place with an email and phone added, spelled a little differently: one entry, filled in.
+    const again = w.saveAddress({ ...robin, line1: 'kade 1', postalCode: '9000 ', email: 'robin@example.com', tel: '+32 470 12 34 56' })
+    expect(again.id).toBe(first.id)
+    expect(w.addresses()).toHaveLength(1)
+    expect(w.mine()).toMatchObject({ email: 'robin@example.com', tel: '+32 470 12 34 56', mine: true })
+    // Only part of it (what a shop's form had): still the same entry, nothing lost.
+    expect(w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Robin', familyName: 'Vos', postalCode: '9000' }).id).toBe(first.id)
+    expect(w.mine()?.line1).toBe('Kade 1')
+    // Someone else at the same address, or the same person elsewhere, is a new entry.
+    expect(w.saveAddress({ ...robin, givenName: 'Kim' }).id).not.toBe(first.id)
+    expect(w.saveAddress({ ...robin, line1: 'Dok 7', postalCode: '9000', city: 'Gent' }).id).not.toBe(first.id)
+    expect(w.addresses()).toHaveLength(3)
+  })
+})
+
 describe('cards', () => {
   it('stores the number encrypted and never shows it in views', () => {
     const dir = mkdtempSync(join(tmpdir(), 'atelier-wallet-'))

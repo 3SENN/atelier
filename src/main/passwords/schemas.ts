@@ -30,6 +30,7 @@ const address = z
     country: z.string().regex(/^([A-Z]{2})?$/),
     email: z.string().max(320),
     tel: z.string().max(40),
+    mine: z.boolean().optional(),
   })
   .strict()
 
@@ -72,6 +73,7 @@ export const PASSWORDS_SCHEMAS: SchemaMap<PasswordsServices> = {
     addresses: z.tuple([]),
     saveAddress: z.tuple([address]),
     removeAddress: z.tuple([idSchema]),
+    setMine: z.tuple([idSchema.nullable()]),
     cards: z.tuple([]),
     saveCard: z.tuple([card]),
     removeCard: z.tuple([idSchema]),

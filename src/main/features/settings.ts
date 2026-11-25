@@ -20,6 +20,7 @@ import { choiceFromFlags, dockIconImage, flagPatches, migratedDockChoice, resetD
 import { toasts } from '../dialogs'
 import { mainT } from '../i18n/mainT'
 import { detectBrowsers, profileReader, runImport, type ImportSinks } from '../importBrowsers'
+import { saveImportedAddresses } from '../importAddresses'
 import { extensionImportServices } from '../importExtensionsStore'
 import { writeCookies } from '../importCookies'
 import { engineId } from '../importFormats'
@@ -308,6 +309,10 @@ function importSinks(rt: Runtime): ImportSinks {
       if (added > 0) ctx.settings.update({ customSearchEngines: next })
       return added
     },
+    // Into the one wallet (passwords feature); a near-copy fills in the saved
+    // one, so the count is only the addresses that weren't there. A wallet the
+    // keychain can't open fails this type alone.
+    addresses: (items) => saveImportedAddresses(ctx.personal.wallet, items).added,
     // The import runs into the asking window's profile (ST-46): set the
     // signed-in sessions into that window's session. The count is the number
     // of sites; writeCookies logs imported/skipped but never a value.

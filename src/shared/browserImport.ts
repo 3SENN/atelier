@@ -8,11 +8,12 @@
 // pick what to bring over and show progress and a summary.
 
 /**
- * What can come over. Passwords come from CSV (ST-41). Cookies (signed-in
- * sessions) are an explicit opt-in, offered only for Chromium browsers on
- * macOS and never ticked by default; detectBrowsers decides where they show.
+ * What can come over. Passwords come from CSV (ST-41). Saved addresses go
+ * into the wallet; cards never come over. Cookies (signed-in sessions) are an
+ * explicit opt-in, offered only for Chromium browsers on macOS and never
+ * ticked by default; detectBrowsers decides where they show.
  */
-export const IMPORT_TYPES = ['bookmarks', 'history', 'tabs', 'searchEngines', 'cookies'] as const
+export const IMPORT_TYPES = ['bookmarks', 'history', 'tabs', 'searchEngines', 'addresses', 'cookies'] as const
 export type ImportType = (typeof IMPORT_TYPES)[number]
 
 export type ImportBrowserKind = 'chromium' | 'firefox' | 'safari'
@@ -23,12 +24,17 @@ export type ImportBrowserKind = 'chromium' | 'firefox' | 'safari'
  * only) and is appended by detectBrowsers, so it never shows elsewhere.
  */
 export const BROWSER_TYPES: Readonly<Record<ImportBrowserKind, readonly ImportType[]>> = {
-  chromium: ['bookmarks', 'history', 'tabs', 'searchEngines'],
-  firefox: ['bookmarks', 'history', 'tabs', 'searchEngines'],
+  chromium: ['bookmarks', 'history', 'tabs', 'searchEngines', 'addresses'],
+  firefox: ['bookmarks', 'history', 'tabs', 'searchEngines', 'addresses'],
+  // Safari keeps addresses in Contacts, not in its own files.
   safari: ['bookmarks', 'history'],
 }
 
-/** Ticked when the import panel opens: everything but cookies, which stays an opt-in. */
+/**
+ * Ticked when the import panel opens: everything but cookies, which stays an
+ * opt-in (another browser's Keychain key, and live sign-ins). Addresses are
+ * ticked: reading them needs no prompt and they land in the encrypted wallet.
+ */
 export const DEFAULT_UNCHECKED_TYPES: readonly ImportType[] = ['cookies']
 
 export interface ImportProfile {

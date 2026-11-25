@@ -11,7 +11,7 @@ import type { AgentEvent } from '@shared/ipc'
 import type { Routine } from '@shared/services'
 import { CHAT_TITLE_MAX, chatMarkdown } from '../chats'
 import type { AgentBackend } from '../engines/backend'
-import { AgentSession, type SendResult, type SessionDeps, type SessionHooks } from './session'
+import { AgentSession, type ChatBrowser, type SendResult, type SessionDeps, type SessionHooks } from './session'
 import type { MessageSource } from '@shared/chats'
 import type { ChatPreview, TabUsed } from '@shared/services/chat'
 import { network } from '../network'
@@ -213,6 +213,11 @@ export class AgentHost implements AgentHostApi {
   }
 
   /** What delegation needs from the host. */
+  /** A loaded chat's browser, for a client tool that drives it (browser_steps); null when the chat isn't loaded. */
+  browserFor(chatId: string): ChatBrowser | null {
+    return this.#sessions.get(chatId)?.chatBrowser() ?? null
+  }
+
   delegationHost(): DelegationHost {
     return {
       startChild: (parentChatId, task, onStatus) => this.#startChild(parentChatId, task, onStatus),

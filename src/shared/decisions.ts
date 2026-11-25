@@ -398,6 +398,8 @@ export interface DecisionsStatus {
   differed: number
   /** The on-device model's optional larger half (atelier-mini): whether it is here, downloading, or can be downloaded. */
   mini?: MiniStatus
+  /** atelier-step, the optional model for browser tasks (deviceStep in feature.ts), in the same states as the mini. */
+  step?: MiniStatus
 }
 
 /**
@@ -477,5 +479,9 @@ export interface DecisionsServices {
     installMini(): Promise<DecisionsStatus>
     cancelMini(): Promise<DecisionsStatus>
     removeMini(): Promise<DecisionsStatus>
+    /** atelier-step (browser tasks): the same for its download. */
+    installStep(): Promise<DecisionsStatus>
+    cancelStep(): Promise<DecisionsStatus>
+    removeStep(): Promise<DecisionsStatus>
   }
 }

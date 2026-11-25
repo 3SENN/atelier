@@ -10,7 +10,9 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { promisify } from 'node:util'
 import { BROWSER_TYPES, importOutcome, type ImportBrowser, type ImportBrowserKind, type ImportCounts, type ImportProfile, type ImportProgress, type ImportRequest, type ImportSummary, type ImportType } from '@shared/browserImport'
+import type { AddressInput } from '@shared/passwords'
 import type { HistoryItem } from '@shared/services'
+import { chromiumAddresses, firefoxProfileAddresses } from './importAddresses'
 import { cookiesFilePath, deriveCookieKey, keychainPassword, readChromiumCookies, safeStorageService, type ImportedCookie } from './importCookies'
 import { parseChromiumBookmarks, readChromium } from './importer'
 import { mainT } from './i18n/mainT'
@@ -22,6 +24,7 @@ import { log } from './log'
 // reading because the owning browser keeps them locked while it runs; the
 // other browser's files are only ever read. Cookies (signed-in sessions) are
 // an opt-in offered only for Chromium browsers on macOS; see importCookies.ts.
+// Saved addresses go into the wallet, never cards; see importAddresses.ts.
 
 const HISTORY_LIMIT = 5000
 const TABS_LIMIT = 200
@@ -195,6 +198,8 @@ export interface ProfileReader {
   history(): Promise<HistoryItem[]>
   tabs(): Promise<ImportedTab[]>
   searchEngines(): Promise<ImportedEngine[]>
+  /** Saved addresses (autofill profiles); card data is never read. */
+  addresses(): Promise<AddressInput[]>
   /** Chromium on macOS only; the key comes from the Keychain (a prompt), others return []. */
   cookies(): Promise<ImportedCookie[]>
 }
@@ -228,6 +233,10 @@ export function profileReader(platform: NodeJS.Platform, home: string, env: Node
         return query<{ short_name: string; url: string }>(file, 'SELECT short_name, url FROM keywords')
           .map((r) => chromiumEngine({ short_name: String(r.short_name), url: String(r.url) }))
           .filter((e): e is ImportedEngine => e !== null)
+      },
+      addresses: async () => {
+        const file = join(dir, 'Web Data')
+        return existsSync(file) ? chromiumAddresses(file) : []
       },
       cookies: async () => {
         // Only ever requested on macOS (detectBrowsers gates the checkbox).
@@ -263,6 +272,7 @@ export function profileReader(platform: NodeJS.Platform, home: string, env: Node
         const file = join(profile.dir, 'search.json.mozlz4')
         return existsSync(file) ? firefoxEngines(readMozLz4(readFileSync(file))) : []
       },
+      addresses: async () => firefoxProfileAddresses(profile.dir),
       cookies: async () => [],
     }
   }
@@ -285,6 +295,8 @@ export function profileReader(platform: NodeJS.Platform, home: string, env: Node
     },
     tabs: async () => [],
     searchEngines: async () => [],
+    // Safari keeps addresses in Contacts, not in its own files.
+    addresses: async () => [],
     cookies: async () => [],
   }
 }
@@ -295,6 +307,8 @@ export interface ImportSinks {
   history(items: HistoryItem[]): number
   tabs(items: ImportedTab[]): number
   searchEngines(items: ImportedEngine[]): number
+  /** Saves into the wallet; the count is the addresses that weren't there yet. */
+  addresses(items: AddressInput[]): number
   /** Writes cookies into a session (async); the count returned is the number of sites. */
   cookies(items: ImportedCookie[]): number | Promise<number>
 }

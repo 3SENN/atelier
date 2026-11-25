@@ -132,7 +132,7 @@ export class PasswordVault {
   #broken = false
   readonly #listeners = new Set<Listener>()
 
-  /** `dataDir` is the profile's data folder (each profile has its own vault). */
+  /** `dataDir` is Atelier's data folder: one vault, shared by every browser profile (passwords/index.ts). */
   constructor(dataDir: string, cipher: VaultCipher) {
     this.#path = join(dataDir, VAULT_FILE)
     this.#cipher = cipher

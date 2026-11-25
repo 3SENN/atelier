@@ -14,6 +14,7 @@ import type {
 import type { WebContents } from 'electron'
 import { z } from 'zod'
 import type { ElementDescription, FormInputResult, ResolvedElement } from '@shared/ipc'
+import type { StepPage } from '@shared/browserSteps'
 import { isAppRunUrl, isBlankUrl, originOf, parseAgentNavigation, parseInternalUrl } from '@shared/url'
 import { isArtifactUrl } from '@shared/files'
 import { isExtensionUrl } from '@shared/extensions'
@@ -639,6 +640,15 @@ export class BrowserToolExecutor implements ToolHandler {
   async #pdfOf(tab: Tab): Promise<import('./pdfTab').PdfTabReader | null> {
     const reader = this.#deps.pdf?.() ?? null
     return reader && (await reader.isPdf(tab)) ? reader : null
+  }
+
+  /** The page as atelier-step reads it (agent/tools/browserSteps.ts): the named tab, else the agent's own, else the person's. A blank tab or a PDF has none. */
+  async stepPage(tabId?: string | null): Promise<{ tabId: string; title: string; url: string; page: StepPage | null }> {
+    const tab = this.#tab(tabId)
+    const wc = tab.view.webContents
+    if (isBlank(tab) || (await this.#pdfOf(tab))) return { tabId: tab.id, title: wc.getTitle(), url: wc.getURL(), page: null }
+    const page = await this.#deps.bridge.request<StepPage>(wc, { op: 'stepPage' })
+    return { tabId: tab.id, title: wc.getTitle(), url: wc.getURL(), page }
   }
 
   async #readPage(input: MemberInput<'read_page'>): Promise<ResultBlock[]> {

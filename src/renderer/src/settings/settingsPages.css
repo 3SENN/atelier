@@ -607,7 +607,7 @@
   margin-bottom: var(--space-2);
 }
 
-.sp-import__cookies-note {
+.sp-import__type-note {
   margin: calc(-1 * var(--space-1)) var(--space-2) var(--space-1) var(--space-8);
 }
 

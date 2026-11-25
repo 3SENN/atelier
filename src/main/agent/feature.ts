@@ -8,6 +8,8 @@
 // delegation and the prompt viewer. It installs this runtime on the
 // agent host, so every session (either engine) asks, counts down, refuses
 // blocked sites and records its turns the same way.
+import { deviceSteps } from '../decisions/device'
+import { registerBrowserSteps } from './tools/browserSteps'
 import { join } from 'node:path'
 import type { AgentToolsMethods, AgentSitesService, PrivateChatsMethods, PermissionsOverview, SiteAccess } from '@shared/agentTools'
 import { chatUrl } from '@shared/url'
@@ -112,6 +114,8 @@ export function createAgentFeatures(): Feature {
           })
       installPrivateClose(privateClose)
       registerAgentTools({ delegate: (input, toolCtx) => delegations.run(input, toolCtx), companionFiles: new CompanionFiles(ctx.dataDir) })
+      // docs/decisions.md › Browser tasks: atelier-step takes a browser task page by page, through this chat's own browser steps.
+      registerBrowserSteps({ browser: (chatId) => ctx.agent.browserFor(chatId), steps: deviceSteps })
 
       mode.on('changed', (next) => ctx.broadcast({ type: 'agent-mode', mode: next }))
       ctx.settings.on('changed', () => mode.storedChanged())

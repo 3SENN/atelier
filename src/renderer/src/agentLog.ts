@@ -3,6 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import type { BrowserStepLine, BrowserStepsStatus } from '@shared/browserSteps'
 import type { AgentEvent, AgentStatus } from '@shared/ipc'
 import type { AttachmentRef } from '@shared/attachments'
 import type { LibraryFileRef } from '@shared/files'
@@ -61,6 +62,7 @@ export type LogItem =
   | { kind: 'question'; id: string; questions: QuestionSpec[]; outcome: RequestOutcome | null }
   | { kind: 'plan'; id: string; items: PlanItem[] }
   | { kind: 'delegation'; id: string; childChatId: string; title: string; status: DelegationStatus }
+  | { kind: 'browser-steps'; id: string; goal: string; status: BrowserStepsStatus; steps: BrowserStepLine[]; note: string | null }
   | { kind: 'routine-proposal'; id: string; draft: RoutineDraft; outcome: RequestOutcome | null }
   | { kind: 'routine-list'; id: string; routineIds: string[] }
   | { kind: 'skill-draft'; id: string; draft: SkillDraft; outcome: RequestOutcome | null }
@@ -227,6 +229,7 @@ export function reduceAgentLog(log: AgentLog, event: AgentEvent): AgentLog {
     case 'question':
     case 'plan':
     case 'delegation':
+    case 'browser-steps':
     case 'routine-proposal':
     case 'routine-list':
     case 'skill-draft':
@@ -259,7 +262,7 @@ function toolStep(event: Extract<AgentEvent, { type: 'tool' }>, prev?: ToolStepI
 }
 
 type AgentToolsEventOf<T extends AgentEvent['type']> = Extract<AgentEvent, { type: T }>
-type AgentToolsEventType = 'auto-approval' | 'site-access' | 'table-write' | 'question' | 'plan' | 'delegation' | 'routine-proposal' | 'routine-list' | 'skill-draft' | 'app-built' | 'source' | 'file-written' | 'request-resolved'
+type AgentToolsEventType = 'auto-approval' | 'site-access' | 'table-write' | 'question' | 'plan' | 'delegation' | 'browser-steps' | 'routine-proposal' | 'routine-list' | 'skill-draft' | 'app-built' | 'source' | 'file-written' | 'request-resolved'
 
 /** Request kinds whose card waits for an answer; `request-resolved` closes them by id. */
 const REQUEST_KINDS = new Set<LogItem['kind']>(['auto-approval', 'site-access', 'table-write', 'question', 'routine-proposal', 'skill-draft', 'app-built'])
@@ -299,6 +302,8 @@ function reduceAgentToolsEvent(log: AgentLog, event: AgentToolsEventOf<AgentTool
       return { ...log, items: [...log.items.filter((item) => item.kind !== 'plan'), { kind: 'plan', id: 'plan', items: event.items }] }
     case 'delegation':
       return { ...log, items: upsert(log.items, event.id, 'delegation', () => ({ kind: 'delegation', id: event.id, childChatId: event.childChatId, title: event.title, status: event.status })) }
+    case 'browser-steps':
+      return { ...log, items: upsert(log.items, event.id, 'browser-steps', () => ({ kind: 'browser-steps', id: event.id, goal: event.goal, status: event.status, steps: event.steps, note: event.note ?? null })) }
     case 'routine-proposal':
       return { ...log, items: upsert(log.items, event.requestId, 'routine-proposal', () => ({ kind: 'routine-proposal', id: event.requestId, draft: event.draft, outcome: null })) }
     case 'routine-list':

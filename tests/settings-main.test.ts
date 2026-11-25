@@ -283,7 +283,8 @@ describe('Dock icon choice (ST-09)', () => {
 
 describe('browser import (ST-46)', () => {
   it('keeps the type matrix per browser kind (cookies are platform-gated, not in the static matrix)', () => {
-    expect(BROWSER_TYPES.chromium).toEqual(['bookmarks', 'history', 'tabs', 'searchEngines'])
+    expect(BROWSER_TYPES.chromium).toEqual(['bookmarks', 'history', 'tabs', 'searchEngines', 'addresses'])
+    expect(BROWSER_TYPES.firefox).toContain('addresses')
     expect(BROWSER_TYPES.safari).toEqual(['bookmarks', 'history'])
     expect(IMPORT_TYPES).toContain('cookies')
   })
@@ -304,20 +305,21 @@ describe('browser import (ST-46)', () => {
     expect(found.map((b) => b.id)).toEqual(['chrome', 'safari'])
     expect(found.find((b) => b.id === 'safari')).toMatchObject({ needsAccess: true, types: ['bookmarks', 'history'] })
     // Cookies are offered for Chromium on macOS only, and sit last in the list.
-    expect(found.find((b) => b.id === 'chrome')?.types).toEqual(['bookmarks', 'history', 'tabs', 'searchEngines', 'cookies'])
+    expect(found.find((b) => b.id === 'chrome')?.types).toEqual(['bookmarks', 'history', 'tabs', 'searchEngines', 'addresses', 'cookies'])
     const bookmarks = await profileReader('darwin', home, {}, 'chrome', 'Default').bookmarks()
     expect(bookmarks).toEqual([{ url: 'https://example.com/', title: 'Example' }])
     expect(() => profileReader('darwin', home, {}, 'chrome', 'Profile 9')).toThrow()
   })
 
   it('reports progress per type and sums up success, partial, nothing and error', async () => {
-    const sinks: ImportSinks = { bookmarks: (items) => items.length, history: (items) => items.length, tabs: (items) => items.length, searchEngines: (items) => items.length, cookies: (items) => items.length }
+    const sinks: ImportSinks = { bookmarks: (items) => items.length, history: (items) => items.length, tabs: (items) => items.length, searchEngines: (items) => items.length, addresses: (items) => items.length, cookies: (items) => items.length }
     const reader = (fail: string[] = [], empty = false): ProfileReader => ({
       bookmarks: async () => (fail.includes('bookmarks') ? Promise.reject(new Error('SQLITE_BUSY')) : empty ? [] : [{ url: 'https://a.example', title: 'A' }]),
       history: async () => (fail.includes('history') ? Promise.reject(new Error('EPERM')) : []),
       // As Windows says it while the browser holds its open session file.
       tabs: async () => (fail.includes('tabs') ? Promise.reject(new Error("EBUSY: resource busy or locked, open 'C:\\Users\\me\\AppData\\Local\\BraveSoftware\\Brave-Browser\\User Data\\Default\\Sessions\\Session_1'")) : []),
       searchEngines: async () => [],
+      addresses: async () => [],
       cookies: async () => [],
     })
     const progress: ImportProgress[] = []

@@ -194,11 +194,11 @@ describe('setupProfiles', () => {
     const site = join(dir, 'Partitions', `atelier-profile-${work.id}`)
     mkdirSync(site, { recursive: true })
     writeFileSync(join(site, 'Cookies'), 'x'.repeat(1000))
-    profiles.manager.addSummarySource(() => ({ logins: 4 }))
+    profiles.manager.addSummarySource(() => ({ ownedChats: 4 }))
     profiles.manager.addSummarySource(() => {
       throw new Error('vault locked')
     })
-    expect(profiles.services.profiles.deletionSummary(work.id)).toEqual({ tabs: 2, historyEntries: 3, logins: 4, siteDataBytes: 1000, ownedChats: 0, ownedCompanions: 0 })
+    expect(profiles.services.profiles.deletionSummary(work.id)).toEqual({ tabs: 2, historyEntries: 3, siteDataBytes: 1000, ownedChats: 4, ownedCompanions: 0 })
     clearWindowProfile(41)
   })
 
@@ -273,19 +273,20 @@ describe('profile menus', () => {
   })
 
   it('sums summaries and sizes folders', () => {
-    expect(sumSummaries([{ tabs: 2 }, { tabs: -1, logins: Number.NaN }, { logins: 3 }])).toMatchObject({ tabs: 2, logins: 3 })
+    expect(sumSummaries([{ tabs: 2 }, { tabs: -1, ownedChats: Number.NaN }, { ownedChats: 3 }])).toMatchObject({ tabs: 2, ownedChats: 3 })
     expect(folderBytes(join(tmpdir(), 'atelier-does-not-exist'))).toBe(0)
   })
 })
 
 describe('Profiles page logic', async () => {
   const logic = await import('@shared/profiles')
-  const summary = { tabs: 3, historyEntries: 120, logins: 2, siteDataBytes: 2_500_000, ownedChats: 0, ownedCompanions: 0 }
+  const summary = { tabs: 3, historyEntries: 120, siteDataBytes: 2_500_000, ownedChats: 0, ownedCompanions: 0 }
 
   it('lists what a deletion removes, and shared things only when owned', () => {
-    expect(logic.deletionRows(summary).map((r) => r.key)).toEqual(['profiles.delete.tabs', 'profiles.delete.history', 'profiles.delete.logins', 'profiles.delete.siteData'])
+    // Passwords, addresses and cards are shared by every profile, so a deletion never lists them.
+    expect(logic.deletionRows(summary).map((r) => r.key)).toEqual(['profiles.delete.tabs', 'profiles.delete.history', 'profiles.delete.siteData'])
     expect(logic.deletionRows({ ...summary, ownedChats: 1 }).map((r) => r.key)).toContain('profiles.delete.chats')
-    expect(logic.deletionRows(summary)[3]?.vars?.size).toMatch(/MB/)
+    expect(logic.deletionRows(summary)[2]?.vars?.size).toMatch(/MB/)
   })
 
   it('arms delete only on the exact name', () => {

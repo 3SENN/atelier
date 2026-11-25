@@ -29,7 +29,6 @@ export interface Profile {
 export interface ProfileDeletionSummary {
   tabs: number
   historyEntries: number
-  logins: number
   siteDataBytes: number
   ownedChats: number
   ownedCompanions: number
@@ -128,15 +127,15 @@ export function deleteBlockMessage(block: ProfileDeleteBlock): Message {
 }
 
 /**
- * The delete dialog's list of what goes (ST-38). Tabs, history, logins and
- * site data always show; companions and chats are shared, so they show only
- * when the profile owns some.
+ * The delete dialog's list of what goes (ST-38). Tabs, history and site data
+ * always show; companions and chats are shared, so they show only when the
+ * profile owns some. Saved passwords, addresses and cards are shared by every
+ * profile and stay, so they aren't listed.
  */
 export function deletionRows(summary: ProfileDeletionSummary): Message[] {
   const rows: Message[] = [
     { key: 'profiles.delete.tabs', vars: { count: summary.tabs } },
     { key: 'profiles.delete.history', vars: { count: summary.historyEntries } },
-    { key: 'profiles.delete.logins', vars: { count: summary.logins } },
     { key: 'profiles.delete.siteData', vars: { size: formatSize(summary.siteDataBytes) } },
   ]
   if (summary.ownedChats > 0) rows.push({ key: 'profiles.delete.chats', vars: { count: summary.ownedChats } })

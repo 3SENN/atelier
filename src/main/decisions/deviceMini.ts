@@ -56,6 +56,10 @@ export interface MiniInstallerOptions {
   external?: boolean
   /** Overrides the manifest's base (ATELIER_DECISION_MINI_URL), for testing a download location. */
   base?: string
+  /** A download of model files only, with no server for this platform (atelier-step, deviceStep.ts). Default true. */
+  needsServer?: boolean
+  /** The installed folder when every file is there (default: the mini's files and its server, deviceMiniDir). */
+  installed?: (dir: string) => string | null
 }
 
 /** Bytes of headroom beyond the download itself, so installing never fills the disk. */
@@ -71,8 +75,10 @@ export class MiniInstaller {
   }
 
   #files(): MiniFile[] | null {
+    if (!this.#base()) return null
+    if (this.#o.needsServer === false) return this.#o.manifest.model.length ? [...this.#o.manifest.model] : null
     const server = this.#o.manifest.servers[this.#o.platform ?? `${process.platform}-${process.arch}`]
-    if (!server?.length || !this.#base()) return null
+    if (!server?.length) return null
     return [...this.#o.manifest.model, ...server.map((f) => ({ ...f, path: `server/${f.path}` }))]
   }
 
@@ -82,6 +88,7 @@ export class MiniInstaller {
 
   /** The installed folder, or null. */
   dir(): string | null {
+    if (this.#o.installed) return this.#o.installed(this.#o.dir)
     return deviceMiniDir(this.#o.dir, (this.#o.platform?.split('-')[0] as NodeJS.Platform | undefined) ?? process.platform)
   }
 

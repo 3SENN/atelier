@@ -302,6 +302,8 @@ export interface Settings extends ExtraEngineSettings {
   userName: string
   /** An optional avatar as a small image data URL (png, jpeg or webp, at most AVATAR_MAX characters). */
   userAvatar: string | null
+  /** Your details (the wallet's address marked as yours) go into new chats' instructions; never private ones. */
+  shareDetails: boolean
   /** Your own colour for the chrome's ground and footer; never the companion's. */
   profileHue: ProfileHue
   /** Atelier's own Reduce Motion, on top of the system setting: either one stills every animation. */
@@ -538,6 +540,8 @@ export type PageCommand =
   | { op: 'formInput'; ref: string; value: string | number | boolean }
   | { op: 'viewport' }
   | { op: 'frame' }
+  /** The page as atelier-step reads it (src/shared/browserSteps.ts StepPage): controls and short text lines in page order. */
+  | { op: 'stepPage' }
 
 export interface ElementDescription {
   role: string
