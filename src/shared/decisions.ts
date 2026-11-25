@@ -104,6 +104,11 @@ export function isPreset(id: string): id is DecisionPresetId {
   return Object.hasOwn(PROVIDER_DEFAULTS, id)
 }
 
+/** Atelier's own model on this computer: no key to connect, and nothing it decides leaves the computer. */
+export function isOnDevice(id: string): boolean {
+  return isPreset(id) && PROVIDER_DEFAULTS[id].keyUrl === ''
+}
+
 /** A server of your own (Kev on this Mac, a gateway not listed above): any System One or Decisions address, a key only if it asks. */
 export interface DecisionServer {
   id: `server-${string}`
@@ -400,6 +405,9 @@ export interface DecisionsStatus {
   mini?: MiniStatus
   /** atelier-step, the optional model for browser tasks (deviceStep in feature.ts), in the same states as the mini. */
   step?: MiniStatus
+  /** The versions those two download (their manifests'), so Settings names the models it offers. */
+  miniVersion?: string
+  stepVersion?: string
 }
 
 /**

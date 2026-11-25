@@ -67,6 +67,11 @@ const SPARE = 200 * 1024 * 1024
 
 export class MiniInstaller {
   readonly #o: MiniInstallerOptions
+
+  /** The version this downloads (its manifest's), as Settings names it. */
+  get version(): string {
+    return this.#o.manifest.version
+  }
   #job: { abort: AbortController; received: number; total: number } | null = null
   #error: string | null = null
 

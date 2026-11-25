@@ -21,6 +21,7 @@ import {
   OWN_SERVER_PLACEHOLDER,
   PROVIDER_DEFAULTS,
   SERVERS_MAX,
+  isOnDevice,
   isPreset,
   isServerUrl,
   perMessageEffort,
@@ -108,6 +109,8 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
   }
 
   const nameOf = (provider: DecisionProviderId): string => (isPreset(provider) ? t(`decisions.provider.${provider}`) : (d.servers.find((s) => s.id === provider)?.name ?? provider))
+  // "at OpenRouter", but "on this computer" for Atelier's own model (its provider's name reads as a place already).
+  const whereOf = (provider: DecisionProviderId): string => (isOnDevice(provider) ? t('decisions.models.onDevice') : t('decisions.models.at', { provider: nameOf(provider) }))
 
   const runTest = async (ref: DecisionModelRef): Promise<void> => {
     const key = refKey(ref)
@@ -237,8 +240,10 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
                 inUse={d.models.some((m) => m.provider === id)}
                 onUse={() => addModel({ provider: id, model: PROVIDER_DEFAULTS[id].suggested })}
                 mini={status.data?.mini}
+                miniModel={modelName('atelier-mini', status.data?.miniVersion)}
                 onMini={(action) => void downloadAction('Mini', action)}
                 step={status.data?.step}
+                stepModel={modelName('atelier-step', status.data?.stepVersion)}
                 onStep={(action) => void downloadAction('Step', action)}
               />
             ) : (
@@ -293,7 +298,7 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
                 {t('decisions.on')} <Badge tone={healthTone(health)}>{t(`decisions.health.${badgeOf(health)}`)}</Badge>
               </>
             }
-            description={<HealthText health={health} nameOf={nameOf} />}
+            description={<HealthText health={health} whereOf={whereOf} />}
             checked={d.on}
             onChange={(on) => patch({ on })}
           />
@@ -314,13 +319,11 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
                     <li key={refKey(ref)} className="dc-model">
                       <div className="dc-model__text">
                         <span className="dc-model__name">
-                          {ref.model}{' '}
-                          <span className="dc-model__where">
-                            {t('decisions.models.at', {
-                              provider: nameOf(ref.provider),
-                            })}
-                          </span>
+                          {ref.model}
+                          {isOnDevice(ref.provider) ? ', ' : ' '}
+                          <span className="dc-model__where">{whereOf(ref.provider)}</span>
                         </span>
+                        {isOnDevice(ref.provider) && status.data?.mini?.state === 'ready' && <span className="sp-field__hint">{t('decisions.models.withMini')}</span>}
                         <span className="dc-model__state">
                           <Badge tone={healthTone(h)}>{i === 0 ? t('decisions.models.first') : t('decisions.models.backup', { n: String(i) })}</Badge> <ModelLine health={h} />
                         </span>
@@ -425,14 +428,19 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
 type DownloadAction = 'install' | 'cancel' | 'remove'
 
 /** One of the on-device models' optional downloads: what it does, and download, stop or remove. */
-function DownloadRow({ anchor, name, description, state, onAction }: { anchor: string; name: string; description: string; state: MiniStatus; onAction(action: DownloadAction): void }): ReactElement {
+/** "atelier-step v0.1" from the name and the version it downloads ("step-v0.1" names its release). */
+function modelName(name: string, version: string | undefined): string {
+  return version ? `${name} ${version.replace(/^[a-z]+-(?=v\d)/, '')}` : name
+}
+
+function DownloadRow({ anchor, name, model, description, state, onAction }: { anchor: string; name: string; model: string; description: string; state: MiniStatus; onAction(action: DownloadAction): void }): ReactElement {
   const t = useT()
   const mb = (bytes: number): string => String(Math.round(bytes / 1e6))
   return (
     <div className="dc-provider" data-settings-anchor={anchor}>
       <div className="dc-provider__text">
         <span className="sp-field__label">
-          {name}{' '}
+          {name} <span className="dc-model__where">· {model}</span>{' '}
           {state.state === 'ready' && <Badge tone="success">{t('decisions.device.mini.ready')}</Badge>}
           {state.state === 'downloading' && <Badge tone="info">{t('decisions.device.mini.downloading', { received: mb(state.received), total: mb(state.total) })}</Badge>}
         </span>
@@ -467,8 +475,10 @@ function DeviceRow({
   inUse,
   onUse,
   mini,
+  miniModel,
   onMini,
   step,
+  stepModel,
   onStep,
 }: {
   id: DecisionPresetId
@@ -476,8 +486,10 @@ function DeviceRow({
   inUse: boolean
   onUse(): void
   mini?: MiniStatus
+  miniModel: string
   onMini(action: DownloadAction): void
   step?: MiniStatus
+  stepModel: string
   onStep(action: DownloadAction): void
 }): ReactElement {
   const t = useT()
@@ -486,7 +498,8 @@ function DeviceRow({
       <div className="dc-provider">
         <div className="dc-provider__text">
           <span className="sp-field__label">
-            {t(`decisions.provider.${id}`)} <Badge tone={installed ? 'success' : 'neutral'}>{installed ? t('decisions.device.ready') : t('decisions.device.missing')}</Badge>
+            {t(`decisions.provider.${id}`)} <span className="dc-model__where">· {PROVIDER_DEFAULTS[id].suggested}</span>{' '}
+            <Badge tone={installed ? 'success' : 'neutral'}>{installed ? t('decisions.device.ready') : t('decisions.device.missing')}</Badge>
           </span>
           <span className="sp-field__hint">{t(`decisions.provider.${id}.description`)}</span>
         </div>
@@ -499,10 +512,10 @@ function DeviceRow({
         </div>
       </div>
       {installed && mini && mini.state !== 'unavailable' && (
-        <DownloadRow anchor="decisions-device-mini" name={t('decisions.device.mini')} description={t('decisions.device.mini.description')} state={mini} onAction={onMini} />
+        <DownloadRow anchor="decisions-device-mini" name={t('decisions.device.mini')} model={miniModel} description={t('decisions.device.mini.description')} state={mini} onAction={onMini} />
       )}
       {step && step.state !== 'unavailable' && (
-        <DownloadRow anchor="decisions-device-step" name={t('decisions.device.step')} description={t('decisions.device.step.description')} state={step} onAction={onStep} />
+        <DownloadRow anchor="decisions-device-step" name={t('decisions.device.step')} model={stepModel} description={t('decisions.device.step.description')} state={step} onAction={onStep} />
       )}
     </div>
   )
@@ -725,33 +738,36 @@ function Catalog({
           })}
         </ul>
       )}
-      <form
-        className="sp-row sp-row--stack"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (!typed.trim()) return
-          onAdd({ provider: current.provider, model: typed.trim() })
-          setTyped('')
-        }}
-      >
-        <span className="sp-field__label">{t('decisions.catalog.other', { provider: nameOf(current.provider) })}</span>
-        <div className="sp-field__row">
-          <TextInput
-            className="sp-input--inline"
-            value={typed}
-            maxLength={120}
-            spellCheck={false}
-            placeholder={isPreset(current.provider) ? PROVIDER_DEFAULTS[current.provider].suggested : 'kev-latest'}
-            aria-label={t('decisions.catalog.other', {
-              provider: nameOf(current.provider),
-            })}
-            onChange={(e) => setTyped(e.target.value)}
-          />
-          <Button type="submit" variant="secondary" disabled={!/^[A-Za-z0-9._:/~@-]+$/.test(typed.trim()) || full}>
-            {t('decisions.catalog.add')}
-          </Button>
-        </div>
-      </form>
+      {/* Atelier's own model has one name; anything typed here would be the same model again. */}
+      {!isOnDevice(current.provider) && (
+        <form
+          className="sp-row sp-row--stack"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!typed.trim()) return
+            onAdd({ provider: current.provider, model: typed.trim() })
+            setTyped('')
+          }}
+        >
+          <span className="sp-field__label">{t('decisions.catalog.other', { provider: nameOf(current.provider) })}</span>
+          <div className="sp-field__row">
+            <TextInput
+              className="sp-input--inline"
+              value={typed}
+              maxLength={120}
+              spellCheck={false}
+              placeholder={isPreset(current.provider) ? PROVIDER_DEFAULTS[current.provider].suggested : 'kev-latest'}
+              aria-label={t('decisions.catalog.other', {
+                provider: nameOf(current.provider),
+              })}
+              onChange={(e) => setTyped(e.target.value)}
+            />
+            <Button type="submit" variant="secondary" disabled={!/^[A-Za-z0-9._:/~@-]+$/.test(typed.trim()) || full}>
+              {t('decisions.catalog.add')}
+            </Button>
+          </div>
+        </form>
+      )}
     </Card>
   )
 }
@@ -768,7 +784,7 @@ function badgeOf(health: DecisionsHealth): 'off' | 'notSetUp' | 'working' | 'fai
 }
 
 /** The status in words, under the switch: what to do next, or how it is doing. */
-function HealthText({ health, nameOf }: { health: DecisionsHealth; nameOf(provider: DecisionProviderId): string }): ReactElement {
+function HealthText({ health, whereOf }: { health: DecisionsHealth; whereOf(provider: DecisionProviderId): string }): ReactElement {
   const t = useT()
   switch (health.kind) {
     case 'off':
@@ -782,7 +798,7 @@ function HealthText({ health, nameOf }: { health: DecisionsHealth; nameOf(provid
         <>
           {t('decisions.line.working', {
             model: health.model.model,
-            provider: nameOf(health.model.provider),
+            where: whereOf(health.model.provider),
           })}
         </>
       )
@@ -859,7 +875,8 @@ export function QuickDecisionsSummary({ settings, onOpen }: { settings: Settings
     health: modelHealth(m, null, false),
   }))
   const health = decisionsHealth(status.data, rows, d.on)
-  const where = (ref: DecisionModelRef): string => (isPreset(ref.provider) ? t(`decisions.provider.${ref.provider}`) : (d.servers.find((s) => s.id === ref.provider)?.name ?? ref.provider))
+  const where = (ref: DecisionModelRef): string =>
+    isOnDevice(ref.provider) ? t('decisions.models.onDevice') : t('decisions.models.at', { provider: isPreset(ref.provider) ? t(`decisions.provider.${ref.provider}`) : (d.servers.find((s) => s.id === ref.provider)?.name ?? ref.provider) })
   const first = d.models[0]
   const shown = health.kind === 'working' ? health.model : first
   const description =
@@ -870,11 +887,11 @@ export function QuickDecisionsSummary({ settings, onOpen }: { settings: Settings
         : health.kind === 'failing'
           ? t('decisions.summary.failing', {
               model: shown.model,
-              provider: where(shown),
+              where: where(shown),
             })
           : t('decisions.summary.on', {
               model: shown.model,
-              provider: where(shown),
+              where: where(shown),
               count: d.models.length,
             })
   return (

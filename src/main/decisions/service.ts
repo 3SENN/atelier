@@ -161,9 +161,9 @@ export interface DecisionsDeps {
   /** The on-device model (device.ts): whether its files are here. Absent, it reads as not installed. */
   device?: { available(): boolean }
   /** The on-device model's optional larger half (deviceMini.ts): its download state, shown in Settings. */
-  mini?: { status(): MiniStatus }
+  mini?: { status(): MiniStatus; readonly version?: string }
   /** atelier-step's download state (browser tasks), shown in Settings next to the mini. */
-  step?: { status(): MiniStatus }
+  step?: { status(): MiniStatus; readonly version?: string }
   now?: () => number
 }
 
@@ -395,8 +395,8 @@ export class Decisions implements Decider {
       }),
       answered: this.#answered,
       differed: this.#differed,
-      ...(this.#d.mini ? { mini: this.#d.mini.status() } : {}),
-      ...(this.#d.step ? { step: this.#d.step.status() } : {}),
+      ...(this.#d.mini ? { mini: this.#d.mini.status(), miniVersion: this.#d.mini.version } : {}),
+      ...(this.#d.step ? { step: this.#d.step.status(), stepVersion: this.#d.step.version } : {}),
     }
   }
 
