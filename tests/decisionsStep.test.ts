@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/main/log', () => ({ log: { warn: () => undefined, debug: () => undefined, info: () => undefined } }))
 
-import { DeviceDecisions, deviceStepDir, type DeviceProcess } from '../src/main/decisions/device'
+import { DeviceDecisions, deviceStepDir, onnxRuntimeHere, type DeviceProcess } from '../src/main/decisions/device'
 import { STEP_FILES } from '../src/main/decisions/device/step'
 import { encodeStep, type StepInput } from '../src/main/decisions/device/stepFormat'
 import { STEP_MANIFEST } from '../src/main/decisions/device/stepManifest'
@@ -48,6 +48,16 @@ describe('atelier-step on this computer', () => {
     expect(deviceStepDir(dir)).toBeNull()
     writeFileSync(join(dir, STEP_FILES.at(-1)!), 'x')
     expect(deviceStepDir(dir)).toBe(dir)
+  })
+
+  it('runs only where ONNX Runtime has a build for this computer (none for macOS on Intel)', () => {
+    mkdirSync(join(dir, 'bin', 'napi-v6', 'darwin', 'arm64'), { recursive: true })
+    const resolve = (): string => join(dir, 'package.json')
+    expect(onnxRuntimeHere('darwin', 'arm64', resolve)).toBe(true)
+    expect(onnxRuntimeHere('darwin', 'x64', resolve)).toBe(false)
+    expect(onnxRuntimeHere('win32', 'x64', () => { throw new Error('not installed') })).toBe(false)
+    // This checkout has a build for the computer running the tests.
+    expect(onnxRuntimeHere()).toBe(true)
   })
 
   it('answers browser steps in the decision helper, with or without the small decision model', async () => {

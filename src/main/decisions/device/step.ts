@@ -13,8 +13,7 @@ import { Tokenizer } from '@huggingface/tokenizers'
 import * as ort from 'onnxruntime-node'
 import { CLICKABLE, EDITABLE, encodeStep, OPS, type StepInput, type StepOp, type StepTokenize } from './stepFormat'
 
-/** The files a usable step model folder holds. */
-export const STEP_FILES = ['model.emb4.int8.onnx', 'step.json', 'tokenizer.json', 'tokenizer_config.json'] as const
+export { STEP_FILES } from './stepFiles'
 
 export interface StepAnswer {
   /** Probability of each operation. */

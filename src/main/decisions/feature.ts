@@ -15,7 +15,7 @@ import { registerResetStep } from '../reset'
 import { appRoot } from '../resources'
 import { registerStorageCategory } from '../storage'
 import type { FetchLike } from './client'
-import { DeviceDecisions, deviceModelDir, deviceStepDir, setDeviceSteps } from './device'
+import { DeviceDecisions, deviceModelDir, deviceStepDir, onnxRuntimeHere, setDeviceSteps } from './device'
 import { MINI_MANIFEST } from './device/miniManifest'
 import { STEP_MANIFEST } from './device/stepManifest'
 import { MiniInstaller } from './deviceMini'
@@ -170,10 +170,12 @@ export function createDecisionsFeature(): Feature {
       // runs in the same helper; ATELIER_STEP_MODEL uses a folder as it is (in smoke runs too, so the tool can be checked).
       let mini: MiniInstaller | null = null
       let stepInstaller: MiniInstaller | null = null
+      const runtime = onnxRuntimeHere()
+      if (!runtime) log.info('decisions', 'ONNX Runtime has no build for this computer: the on-device models are off', { platform: process.platform, arch: process.arch })
       const device = new DeviceDecisions({
-        modelDir: () => (app.smoke ? null : deviceModelDir({ packaged: electronApp.isPackaged, resourcesPath: process.resourcesPath, appPath: appRoot() })),
+        modelDir: () => (app.smoke || !runtime ? null : deviceModelDir({ packaged: electronApp.isPackaged, resourcesPath: process.resourcesPath, appPath: appRoot() })),
         miniDir: () => (app.smoke ? null : (mini?.dir() ?? null)),
-        stepDir: () => stepInstaller?.dir() ?? null,
+        stepDir: () => (runtime ? (stepInstaller?.dir() ?? null) : null),
         spawner: (dir, miniDir, stepDir) =>
           utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), [dir, miniDir ?? '', stepDir ?? ''], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
       })
@@ -196,7 +198,7 @@ export function createDecisionsFeature(): Feature {
         manifest: STEP_MANIFEST,
         needsServer: false,
         installed: deviceStepDir,
-        external: Boolean(stepFolder) || app.smoke,
+        external: Boolean(stepFolder) || app.smoke || !runtime,
         download: async (url, init) => {
           const res = await net.fetch(url, { signal: init.signal, headers: init.headers })
           return { status: res.status, body: res.body as AsyncIterable<Uint8Array> | null }

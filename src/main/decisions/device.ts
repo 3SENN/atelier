@@ -4,11 +4,13 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
 import { DEVICE_SCHEME } from '@shared/decisions'
 import type { FetchLike } from './client'
 import { MINI_FILES, miniServer } from './device/miniFiles'
-import { STEP_FILES, type StepAnswer } from './device/step'
+import { STEP_FILES } from './device/stepFiles'
+import type { StepAnswer } from './device/step'
 import type { StepInput } from './device/stepFormat'
 import { log } from '../log'
 
@@ -35,6 +37,19 @@ export function deviceModelDir(o: { packaged: boolean; resourcesPath: string; ap
 /** The mini's folder (an optional download, deviceMini.ts) when its files and server are all here, else null. */
 export function deviceMiniDir(dir: string, platform: NodeJS.Platform = process.platform): string | null {
   return MINI_FILES.every((f) => existsSync(join(dir, f))) && existsSync(miniServer(dir, platform)) ? dir : null
+}
+
+/**
+ * Whether ONNX Runtime has a build for this computer, which the on-device models need. Each package carries only its
+ * own platform's (electron-builder.yml), and macOS on Intel has none: there the models read as not installed and
+ * their downloads aren't offered, instead of failing on the first question.
+ */
+export function onnxRuntimeHere(platform: string = process.platform, arch: string = process.arch, resolve: (id: string) => string = createRequire(__filename).resolve): boolean {
+  try {
+    return existsSync(join(dirname(resolve('onnxruntime-node/package.json')), 'bin', 'napi-v6', platform, arch))
+  } catch {
+    return false
+  }
 }
 
 /** atelier-step's folder (an optional download, deviceStep.ts) when its files are all here, else null. */
