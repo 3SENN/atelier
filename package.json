@@ -1,7 +1,7 @@
 {
   "name": "atelierbrowser",
   "productName": "Atelier",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Atelier, the browser you make your own: a companion that works in your tabs and builds the tools you describe.",
   "homepage": "https://atelierbrowser.eu",
   "repository": {

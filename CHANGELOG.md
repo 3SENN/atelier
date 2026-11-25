@@ -2,6 +2,10 @@
 
 All notable changes to Atelier. Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
+## 1.7.2 (2026-11-25) — Windows tells you about updates
+
+- **Atelier on Windows tells you about new versions.** The Windows installer isn’t code-signed yet, so Atelier can’t update itself there. It now checks for new versions, at start and every few hours, and shows Get update when one is out. The button opens the download page, and you run the installer; your windows, tabs and settings stay. Settings › About says when Atelier is up to date and has Check for updates, as on Mac. If you have 1.7.1 or older on Windows, download 1.7.2 once from the website; after that, Atelier tells you.
+
 ## 1.7.1 (2026-11-25) — Menus open again
 
 - **Menus open again.** Switch chat, Extensions and the site suggestion button could open as a thin line or not show at all, until a full-window dialog had been open. They now always open at full size, under the button you clicked, and take your clicks.

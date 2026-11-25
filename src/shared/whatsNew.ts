@@ -12,6 +12,17 @@ import type { WhatsNewEntry } from './updates'
 // card combines every entry since the version you last saw.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    version: '1.7.2',
+    date: '2026-11-25',
+    title: 'Windows tells you about updates',
+    highlights: [
+      {
+        title: 'New versions, announced on Windows',
+        body: `On Windows, ${BRAND_NAME} can’t update itself yet. It now checks for new versions and shows Get update when one is out; the button opens the download. Settings › About says when you are up to date.`,
+      },
+    ],
+  },
+  {
     version: '1.7.1',
     date: '2026-11-25',
     title: 'Menus open again',
