@@ -17,6 +17,8 @@ import { z } from 'zod'
 import { BROWSER_STEP_VALUES_MAX, BROWSER_STEPS_DEFAULT, BROWSER_STEPS_MAX, type BrowserStepsCard, type BrowserStepsStatus, type StepPageItem } from '@shared/browserSteps'
 import type { StepAnswer } from '../../decisions/device/step'
 import type { StepElement, StepInput } from '../../decisions/device/stepFormat'
+import type { ActionKind } from '@shared/agentTools'
+import { namesActionKind } from '../guard'
 import type { ChatBrowser } from '../session'
 import { registerClientTool, type ClientTool, type ClientToolContext, type ClientToolResult } from './registry'
 
@@ -33,6 +35,21 @@ const SETTLE_MS = 500
 const ADD_TO_CART =
   /^(add to (cart|basket|bag)|in (de |het )?(winkelwagen|winkelmand|winkelmandje)|toevoegen aan (de )?winkel(wagen|mand)|(zum|in den) warenkorb( hinzufügen| legen)?|ajouter au panier|añadir a la (cesta|carrito)|añadir al carrito)$/i
 const PRICE = /^\s*(?:€|\$|£|EUR)\s?\d|\d+(?:[.,]\d{2})?\s?(?:€|EUR)/
+/**
+ * Clicks that undo or change things (removing from the cart, deleting, cancelling an account, security settings): when
+ * the goal doesn't ask for one, atelier-step reaching for it is a wrong turn, so the companion decides instead of the
+ * person being asked to approve it. The guard's own words, and the other languages it was trained on.
+ */
+const OFF_PATH: readonly ActionKind[] = ['delete', 'account', 'security']
+const DELETE_ELSEWHERE = /\b(verwijder(en)?|wissen|weghalen|l[öo]schen|entfernen|supprimer|retirer|eliminar|quitar|borrar)\b/i
+function offPath(label: string, goal: string): ActionKind | null {
+  for (const kind of OFF_PATH) {
+    const named = namesActionKind(label, kind) || (kind === 'delete' && DELETE_ELSEWHERE.test(label))
+    const asked = namesActionKind(goal, kind) || (kind === 'delete' && DELETE_ELSEWHERE.test(goal))
+    if (named && !asked) return kind
+  }
+  return null
+}
 
 export interface StepModel {
   stepAvailable(): boolean
@@ -61,7 +78,7 @@ type Input = z.infer<typeof input>
 
 const DESCRIPTION = `Runs a task in a browser tab page by page with atelier-step, a small model on this computer: it clicks, fills fields with the values you give and stops when the goal looks reached or it can't go on. A page takes about a tenth of a second, far faster than doing each step yourself.
 
-Use it for routine stretches of a task on a site: adding a product to the cart and going to checkout, filling in a form, following a search to a result, getting through a sign-up. Write the goal with where to stop ("…and go to the payment page, stop there", "…fill in the form, stop before sending"). Give every value it may have to type as a named value (the person's name, email, address, phone, a size, the search words): it never makes up text, so a field nobody gave a value for is left for you.
+Use it for routine stretches of a task on a site: adding a product to the cart and opening the cart, filling in a form, following a search to a result, getting through a sign-up. Give it one stretch at a time, each ending on one page, with where to stop in the goal ("add the Trailrunner 2 in size 43 to the cart and open the cart", "fill in the delivery details and continue to the payment page, stop there", "fill in the form, stop before sending"); a whole task in one goal makes it stop early. Give every value it may have to type as a named value (the person's name, email, address, phone, a size, the search words): it never makes up text, so a field nobody gave a value for is left for you.
 
 It hands the task back to you, with what it did, when it isn't sure, when the person declines a click, when it would go in circles, or when the goal looks reached. Then look at the page yourself (read_page) and carry on with your own browser tools, or call browser_steps again for the next routine stretch. It can be wrong about "done": check before you tell the person. Every click goes through the same checks and approvals as yours; buying, paying and sending always stay with the person.`
 
@@ -211,6 +228,8 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
           const target = i === null ? undefined : items[i]
           if (!target) return handBack('atelier-step isn’t sure which control to click next', 'Not sure what to click next.')
           if (refused.has(target.label)) return handBack(`the person said no to ${q(target.label)} before`, `You said no to ${q(target.label)}.`)
+          const off = offPath(target.label, task.goal)
+          if (off) return handBack(`atelier-step reached for ${q(target.label)} (a ${off} click the goal doesn’t ask for); decide the next step yourself`, `It reached for ${q(target.label)}; your companion decides instead.`)
           const adds = ADD_TO_CART.test(target.label.trim())
           if (adds && added) return handBack(`it would add a second item to the cart (${q(target.label)})`, 'It would add a second item to the cart.')
           if (circling(`click|${target.label}|${target.context ?? ''}|${pathOf(read.url)}`)) return handBack(`it was going in circles (clicking ${q(target.label)} again)`, 'It was going in circles.')

@@ -228,12 +228,33 @@ export async function captureTour(deps: ShotDeps): Promise<string[]> {
   await chrome.until(`return document.querySelector('.pill__detail')?.textContent === 'Second page'`, 6000, 'the pill to show the page title')
   await shootToolbar('address-pill-website')
   if (baseState.picnicChatId) await open(`atelier://chat/${baseState.picnicChatId}`, '.chat-log', 'chat-page', 700)
+  // Browser tasks (docs/decisions.md): the steps card as a browser_steps run leaves it.
+  if (baseState.picnicChatId) {
+    deps.host.appendEvent(baseState.picnicChatId, {
+      type: 'browser-steps',
+      id: 'shot-steps',
+      goal: 'Add the Trailrunner 2 in size 43 to the cart and open the cart',
+      status: 'done',
+      steps: [
+        { text: 'Clicked “Trailrunner 2 trail shoes”', ms: 92 },
+        { text: 'Filled in “Size (EU)”: “43”', ms: 88 },
+        { text: 'Clicked “Add to cart”', ms: 86 },
+        { text: 'Clicked “Go to cart”', ms: 90 },
+      ],
+    })
+    await open(`atelier://chat/${baseState.picnicChatId}`, '.cd-steps', 'chat-browser-steps', 700)
+  }
   if (baseState.runningChatId) await open(`atelier://chat/${baseState.runningChatId}`, '.chat-log', 'chat-working', 500)
   await open('atelier://chats', '.chats-page', 'all-chats')
   await open('atelier://skills', '.sp-page', 'skills')
   await open('atelier://routines', '.sp-page', 'routines')
   await open('atelier://connectors', '.sp-page', 'connectors')
+  // Your details (Settings › You): the saved address marked as yours.
+  await chrome
+    .invoke('wallet', 'saveAddress', { givenName: 'Sam', additionalName: '', familyName: 'Lee', organization: '', line1: 'Kade 1', line2: '', line3: '', city: 'Utrecht', region: '', postalCode: '3512 AB', country: 'NL', email: 'sam@example.com', tel: '+31 6 1234 5678', mine: true })
+    .catch(() => undefined)
   await open('atelier://settings/you', '.sp-page', 'settings-you')
+  await open('atelier://settings/decisions', '.sp-page', 'settings-decisions', 700)
   await open('atelier://settings/appearance', '.sp-page', 'settings-appearance')
   await shootToolbar('address-pill-atelier', 100)
   await open('atelier://settings/companions', '.sp-page', 'settings-companions', 700)

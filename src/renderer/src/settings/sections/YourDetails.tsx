@@ -10,7 +10,7 @@
 import { useState, type ReactElement } from 'react'
 import { MapPin, Pencil, Plus } from 'lucide-react'
 import type { SettingsView } from '@shared/ipc'
-import type { AddressView } from '@shared/passwords'
+import { countryOptions, type AddressView } from '@shared/passwords'
 import { atelier, call, errorText } from '../../api'
 import { useEvent, useResource } from '../data'
 import { useT } from '../../i18n/useT'
@@ -39,7 +39,8 @@ export function YourDetailsSection({ settings, onSettings }: { settings: Setting
     }
   }
 
-  const place = mine ? [[mine.line1, mine.line2, mine.line3].filter(Boolean).join(', '), [mine.postalCode, mine.city].filter(Boolean).join(' '), mine.region, mine.country].filter(Boolean).join(', ') : ''
+  const country = mine?.country ? (countryOptions().find((c) => c.value === mine.country)?.label ?? mine.country) : ''
+  const place = mine ? [[mine.line1, mine.line2, mine.line3].filter(Boolean).join(', '), [mine.postalCode, mine.city].filter(Boolean).join(' '), mine.region, country].filter(Boolean).join(', ') : ''
   const name = mine ? [mine.givenName, mine.additionalName, mine.familyName].filter(Boolean).join(' ') || mine.organization : ''
 
   return (

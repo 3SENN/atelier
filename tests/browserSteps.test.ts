@@ -206,6 +206,20 @@ describe('browser_steps', () => {
     expect(res.content).toMatch(/not installed/)
   })
 
+  it('hands a delete click the goal doesn’t ask for back to the companion, in any language, and takes it when asked', async () => {
+    const cart = (): Page => ({ title: 'Cart', url: 'https://shop.test/cart', items: [{ ref: 'c1', role: 'button', label: 'Remove', group: 'main-1' }, { ref: 'c2', role: 'link', label: 'Checkout', group: 'main-1' }] })
+    const h = harness([cart()], [() => answer(2, { op: { click: 0.9 }, click: { 0: 0.9, 1: 0.1 } })])
+    const out = await h.run({ goal: 'Go to checkout and fill in the delivery details' })
+    expect(h.steps).toEqual([])
+    expect(out.content).toMatch(/reached for “Remove” \(a delete click the goal doesn’t ask for\)/)
+    const nl: Page = { title: 'Winkelwagen', url: 'https://shop.test/wagen', items: [{ ref: 'n1', role: 'button', label: 'Verwijderen', group: 'main-1' }, { ref: 'n2', role: 'link', label: 'Afrekenen', group: 'main-1' }] }
+    const h2 = harness([nl], [() => answer(2, { op: { click: 0.9 }, click: { 0: 0.9, 1: 0.1 } })])
+    expect((await h2.run({ goal: 'Ga naar afrekenen' })).content).toMatch(/reached for “Verwijderen”/)
+    const h3 = harness([cart()], [() => answer(2, { op: { click: 0.9 }, click: { 0: 0.9, 1: 0.1 } }), () => answer(2, { op: { done: 0.9 } })])
+    await h3.run({ goal: 'Remove the tent from the cart' })
+    expect(h3.steps).toEqual([{ name: 'left_click', ref: 'c1' }])
+  })
+
   it('keeps context only where training had it: repeated labels and prices', async () => {
     const list: Page = {
       title: 'Orders',

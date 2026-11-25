@@ -53,6 +53,11 @@ function kindOf(name: string): ActionKind | null {
   return null
 }
 
+/** Whether a text (a control's label, a task's goal) has the words of a kind of action, by the same list as the guard. */
+export function namesActionKind(text: string, kind: ActionKind): boolean {
+  return KIND_NAMES.some(([k, pattern]) => k === kind && pattern.test(text))
+}
+
 function result(reason: string, action: ActionKind): GuardResult {
   return { reason, action, alwaysAsk: ALWAYS_ASK.has(action) }
 }
