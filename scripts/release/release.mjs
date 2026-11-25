@@ -109,7 +109,8 @@ function preflight(version, settings, opts, env) {
 function describe(settings) {
   const s = settings.signing
   console.log(`  channel ${settings.channel}${settings.publicRelease ? ', public' : ''}, app id ${settings.bundleId}`)
-  console.log(`  updates ${settings.updatesEnabled ? `on, from ${settings.repo.owner}/${settings.repo.name}` : 'off'}`)
+  const from = settings.repo ? `from ${settings.repo.owner}/${settings.repo.name}` : ''
+  console.log(`  updates ${settings.updatesEnabled ? `on, ${from}` : settings.updateNotices ? `announced only (an unsigned build can't install them), ${from}` : 'off'}`)
   console.log(`  signing ${s.identity ? `from ${s.identity}` : 'off (unsigned)'}${s.platform === 'darwin' ? `, notarization ${s.notarize ? `with ${s.notarize}` : 'skipped'}` : ''}`)
   if (!s.identity && s.platform !== 'linux') console.warn('  ! unsigned: fine for testing on this machine, not for anyone else')
   if (s.platform === 'darwin' && s.identity && !s.notarize) console.warn('  ! signed but not notarized: Gatekeeper will block it on other Macs')

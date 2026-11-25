@@ -627,11 +627,13 @@ export const checks: SmokeCheck[] = [
     },
   },
   {
-    name: 'updates: unpackaged and unsigned builds hide the pill, the About section and every update menu item',
+    name: 'updates: unpackaged builds, and unsigned ones that announce nothing, hide the pill, the About section and every update menu item',
     async run(ctx) {
       const reason = disabledReasonFor({ packaged: app.isPackaged, updatesEnabled: RELEASE.updatesEnabled, platform: process.platform, appImage: Boolean(process.env.APPIMAGE) })
-      // A signed, packaged build would build the real updater: smoke stays offline and skips this.
+      // A signed, packaged build would build the real updater, and an unsigned release build the one that
+      // announces updates (RELEASE.updateNotices): both check GitHub, so smoke stays offline and skips this.
       if (reason !== 'unpackaged' && reason !== 'unsigned') return
+      if (reason === 'unsigned' && RELEASE.updateNotices) return
       await toReady(ctx)
       await pillReads(ctx, 'ready')
       const r = runtime()

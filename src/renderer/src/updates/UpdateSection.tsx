@@ -25,7 +25,8 @@ export interface UpdateSectionProps {
 
 // The About page's update rows (ST-56): the version and channel with the update status and
 // its action, the "Download updates automatically" switch, and where the
-// check goes. Unpackaged and unsigned builds show the version only.
+// check goes. Unpackaged builds show the version only; an unsigned release
+// build (status.manual) checks and links to the download, with no switch.
 export function UpdateSection({ settings, update, versionDetail }: UpdateSectionProps): ReactElement {
   const t = useT()
   const status = useUpdateStatus()
@@ -128,7 +129,7 @@ export function UpdateSection({ settings, update, versionDetail }: UpdateSection
           </span>
         )}
       </Row>
-      {visible && status.disabledReason !== 'unsupported-package' && (
+      {visible && status.disabledReason !== 'unsupported-package' && !status.manual && (
         <Row id="auto-download" anchor="auto-download" title={t('updates.about.autoDownload')} description={t('updates.about.autoDownloadBody')} htmlFor={switchId}>
           <span data-update-section>
             <Switch id={switchId} checked={view?.autoDownloadUpdates ?? true} disabled={!view} onChange={(on) => void save({ autoDownloadUpdates: on })} />

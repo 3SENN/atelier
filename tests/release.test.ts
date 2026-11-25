@@ -116,6 +116,7 @@ describe('release settings from env', () => {
       channel: 'dev',
       publicRelease: false,
       updatesEnabled: false,
+      updateNotices: false,
       supportEmail: '',
       website: '',
       repo: null,
@@ -131,6 +132,7 @@ describe('release settings from env', () => {
       channel: 'stable',
       publicRelease: false,
       updatesEnabled: true,
+      updateNotices: false,
       supportEmail: 'help@example.org',
       website: 'https://example.org/atelier',
       repo: { owner: 'someone', name: 'atelier' },
@@ -155,6 +157,22 @@ describe('release settings from env', () => {
     // An AppImage updates without code signing.
     expect(releaseSettings({ ...PUBLISH }, 'linux').updatesEnabled).toBe(true)
     expect(releaseSettings({ ...PUBLISH, ATELIER_RELEASE_OWNER: 'bad owner' }, 'linux').repo).toBeNull()
+  })
+
+  it('lets an unsigned macOS or Windows release announce updates it cannot install', () => {
+    for (const platform of ['win32', 'darwin']) {
+      expect(releaseSettings({ ...PUBLISH }, platform)).toMatchObject({ updatesEnabled: false, updateNotices: true })
+      expect(appRelease({ ...PUBLISH }, platform).release).toMatchObject({ updatesEnabled: false, updateNotices: true })
+    }
+    // The build tools keep the choice: electron-vite computes the same defines from this env.
+    expect(buildEnv(releaseSettings({ ...PUBLISH }, 'win32'), { ...PUBLISH }).ATELIER_UPDATES).toBeUndefined()
+    expect(buildEnv(releaseSettings({}, 'win32'), {}).ATELIER_UPDATES).toBe('0')
+    // Signed builds install updates themselves; ATELIER_UPDATES=0, a dev build and a build without a repo stay silent.
+    expect(releaseSettings({ ...PUBLISH, ...AZURE }, 'win32').updateNotices).toBe(false)
+    expect(releaseSettings({ ...PUBLISH }, 'linux').updateNotices).toBe(false)
+    expect(releaseSettings({ ...PUBLISH, ATELIER_UPDATES: '0' }, 'win32').updateNotices).toBe(false)
+    expect(releaseSettings({ ...PUBLISH, ATELIER_CHANNEL: 'dev' }, 'win32').updateNotices).toBe(false)
+    expect(releaseSettings({ ATELIER_CHANNEL: 'stable' }, 'win32').updateNotices).toBe(false)
   })
 
   it('keeps only a plausible email and an https website', () => {

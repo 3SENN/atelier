@@ -21,7 +21,7 @@ export interface UpdateMenuActions {
   install(): void
 }
 
-/** Whether update items show at all: unpackaged and unsigned builds hide them (ST-56). */
+/** Whether update items show at all: unpackaged builds, and unsigned ones that don't announce updates, hide them (ST-56). */
 export function updatesVisible(status: UpdateStatus): boolean {
   return status.disabledReason !== 'unpackaged' && status.disabledReason !== 'unsigned'
 }

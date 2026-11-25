@@ -133,11 +133,14 @@ export function releaseSettings(env = process.env, platform = process.platform) 
   // signature (a deb can't self-update at all, which the update machine reports at runtime).
   const canInstallUpdates = platform === 'linux' || signing.identity !== null
   const email = text(env, 'ATELIER_SUPPORT_EMAIL')
+  const checksForUpdates = repo !== null && channel !== 'dev' && text(env, 'ATELIER_UPDATES') !== '0'
   return {
     channel,
     // A public build is one anyone may download: it takes updates from the public repo.
     publicRelease,
-    updatesEnabled: repo !== null && channel !== 'dev' && canInstallUpdates && text(env, 'ATELIER_UPDATES') !== '0',
+    updatesEnabled: checksForUpdates && canInstallUpdates,
+    // An unsigned macOS or Windows build can't install an update, so it only says a newer release is out.
+    updateNotices: checksForUpdates && !canInstallUpdates,
     supportEmail: EMAIL.test(email) ? email : '',
     website: website(text(env, 'ATELIER_WEBSITE')),
     repo,
@@ -152,7 +155,7 @@ export function viteDefines(settings) {
   return {
     __ATELIER_CHANNEL__: JSON.stringify(settings.channel),
     __ATELIER_PUBLIC_RELEASE__: JSON.stringify(settings.publicRelease ? '1' : '0'),
-    __ATELIER_UPDATES__: JSON.stringify(settings.updatesEnabled ? '1' : '0'),
+    __ATELIER_UPDATES__: JSON.stringify(settings.updatesEnabled ? '1' : settings.updateNotices ? 'notify' : '0'),
     __ATELIER_SUPPORT_EMAIL__: JSON.stringify(settings.supportEmail),
     __ATELIER_WEBSITE__: JSON.stringify(settings.website),
     __ATELIER_RELEASE_REPO__: JSON.stringify(settings.repo ? `${settings.repo.owner}/${settings.repo.name}` : ''),
@@ -192,7 +195,7 @@ export function buildEnv(settings, env = process.env) {
   const out = { ...env }
   out.ATELIER_CHANNEL = settings.channel
   out.ATELIER_PUBLIC_RELEASE = settings.publicRelease ? '1' : '0'
-  if (!settings.updatesEnabled) out.ATELIER_UPDATES = '0'
+  if (!settings.updatesEnabled && !settings.updateNotices) out.ATELIER_UPDATES = '0'
   if (!settings.signing.identity) out.CSC_IDENTITY_AUTO_DISCOVERY = 'false'
   delete out.ELECTRON_RUN_AS_NODE
   return out

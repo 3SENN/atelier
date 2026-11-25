@@ -89,7 +89,7 @@ const attentionFake = { onChange: () => () => undefined }
 
 describe('RELEASE', () => {
   it('has safe defaults without build defines', () => {
-    expect(RELEASE).toEqual({ channel: 'dev', publicRelease: false, updatesEnabled: false, supportEmail: '', website: '', repo: null })
+    expect(RELEASE).toEqual({ channel: 'dev', publicRelease: false, updatesEnabled: false, updateNotices: false, supportEmail: '', website: '', repo: null })
   })
 
   it('parses the defines', () => {
@@ -97,10 +97,16 @@ describe('RELEASE', () => {
       channel: 'beta',
       publicRelease: true,
       updatesEnabled: true,
+      updateNotices: false,
       supportEmail: 'a@b.c',
       website: 'https://x.y',
       repo: { owner: 'me', name: 'atelier' },
     })
+  })
+
+  it('reads an unsigned release build as one that announces updates', () => {
+    expect(releaseFrom({ channel: 'stable', updates: 'notify', repo: 'me/atelier' })).toMatchObject({ updatesEnabled: false, updateNotices: true })
+    expect(releaseFrom({ channel: 'stable', updates: '0', repo: 'me/atelier' })).toMatchObject({ updatesEnabled: false, updateNotices: false })
   })
 
   it('falls back on unknown channels and malformed repos', () => {
@@ -186,6 +192,7 @@ describe('release and platform service schemas', () => {
     dataDir: dir,
     chats: chatsFake(dir),
     windows: { focused: () => null },
+    openPage: () => undefined,
     smoke: false,
     backend: 'fake',
   })

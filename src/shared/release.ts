@@ -22,6 +22,8 @@ export interface ReleaseConfig {
   channel: ReleaseChannel
   publicRelease: boolean
   updatesEnabled: boolean
+  /** An unsigned build with a release repo: it can't update itself, so it announces new releases instead. */
+  updateNotices: boolean
   supportEmail: string
   website: string
   repo: { owner: string; name: string } | null
@@ -45,6 +47,7 @@ export function releaseFrom(raw: {
     channel,
     publicRelease: flag(raw.publicRelease),
     updatesEnabled: flag(raw.updates),
+    updateNotices: raw.updates === 'notify',
     supportEmail: raw.supportEmail ?? '',
     website: raw.website ?? '',
     repo: repoMatch ? { owner: repoMatch[1]!, name: repoMatch[2]! } : null,
