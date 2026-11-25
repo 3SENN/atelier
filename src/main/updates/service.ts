@@ -21,13 +21,16 @@ import { ManualClock, systemClock, type Clock } from './clock'
 import { UpdateController } from './controller'
 import { freeBytes, updaterCacheDir } from './diskSpace'
 import { disabledReasonFor } from './machine'
+import { ReleaseNoticeBackend, releasePageUrl } from './notices'
 import { UpdatesStore } from './store'
 import { fetchSupportFeed, supportFeedUrl } from './supportFeed'
 
 // The update service: builds the controller with the real or the fake
 // backend, and answers Services.updates. ATELIER_SMOKE=1 picks the fake backend
 // on a manual clock, so smoke drives every state with no network and no
-// waiting; the real backend runs only in a packaged, signed build.
+// waiting; the real backend runs only in a packaged, signed build. A packaged
+// build that is unsigned but knows its release repo gets the notice backend
+// instead: it announces a newer release and opens its page (notices.ts).
 
 export interface UpdatesDeps {
   settings: SettingsStore
@@ -47,6 +50,8 @@ export interface UpdatesDeps {
   broadcast(event: AppEvent): void
   /** The focused window gets the restart card and the unsupported prompt. */
   windows: { focused(): WindowContext | null; setQuitting?(quitting: boolean): void }
+  /** Opens a page in a tab: the release page, from a build that only announces updates. */
+  openPage(url: string): void
   smoke: boolean
   /** Which backend: the fake in smoke, otherwise the real one. */
   backend?: 'fake' | 'real'
@@ -122,16 +127,21 @@ export function setupUpdates(deps: UpdatesDeps): UpdatesRuntime & { services: Up
   const build = (): UpdateController => {
     const version = app.getVersion()
     fake = kind === 'fake' ? new FakeUpdaterBackend() : null
-    const disabledReason =
+    const reason =
       kind === 'fake'
         ? null
         : disabledReasonFor({ packaged: app.isPackaged, updatesEnabled: RELEASE.updatesEnabled, platform: process.platform, appImage: Boolean(process.env.APPIMAGE) })
+    // Unsigned, but released: it can't install an update, so it looks for one and says so.
+    const notices = reason === 'unsigned' && RELEASE.updateNotices ? RELEASE.repo : null
+    const disabledReason = notices ? null : reason
     return new UpdateController({
       clock,
       store,
       currentVersion: version,
       disabledReason,
-      backend: (): UpdaterBackend | Promise<UpdaterBackend> => fake ?? createElectronUpdaterBackend(),
+      backend: (): UpdaterBackend | Promise<UpdaterBackend> =>
+        fake ?? (notices ? new ReleaseNoticeBackend({ repo: notices, platform: process.platform, currentVersion: version }) : createElectronUpdaterBackend()),
+      ...(notices ? { openDownload: (v: string) => deps.openPage(releasePageUrl(notices, v)) } : {}),
       autoDownload: () => deps.settings.get().autoDownloadUpdates,
       freeBytes: () =>
         fake
@@ -151,7 +161,7 @@ export function setupUpdates(deps: UpdatesDeps): UpdatesRuntime & { services: Up
       askUnsupported: (below, message) => cards.askUnsupported(below, message),
       supportFeed: async () => {
         if (fake) return feed
-        if (!RELEASE.updatesEnabled || !RELEASE.repo) return null
+        if (!(RELEASE.updatesEnabled || notices) || !RELEASE.repo) return null
         return fetchSupportFeed(supportFeedUrl(RELEASE.repo))
       },
       entries: whatsNewFor(WHATS_NEW, process.platform),
@@ -218,7 +228,7 @@ export function setupUpdates(deps: UpdatesDeps): UpdatesRuntime & { services: Up
     focusedWindow: () => deps.windows.focused(),
     start() {
       controller.start()
-      if (kind === 'real') log.info('updates', 'Updater ready', { disabled: controller.status().disabledReason ?? 'no' })
+      if (kind === 'real') log.info('updates', 'Updater ready', { disabled: controller.status().disabledReason ?? 'no', manual: controller.status().manual })
     },
     dispose() {
       // A ready update installs on quit; record it so the next start can tell whether it worked.

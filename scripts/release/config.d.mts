@@ -21,6 +21,8 @@ export interface ReleaseSettings {
   channel: Channel
   publicRelease: boolean
   updatesEnabled: boolean
+  /** Unsigned with a release repo: the app announces new releases instead of installing them. */
+  updateNotices: boolean
   supportEmail: string
   website: string
   repo: { owner: string; name: string } | null

@@ -11,7 +11,10 @@ export type UpdatePhase = 'disabled' | 'idle' | 'checking' | 'downloading' | 're
 
 export type UpdateErrorKind = 'network' | 'disk-space' | 'signature' | 'install' | 'unknown'
 
-/** Why updates are off for this build. Unpackaged and unsigned builds hide the About section (ST-56). */
+/**
+ * Why updates are off for this build. Unpackaged builds hide the About section (ST-56), and so do unsigned
+ * ones without update notices (RELEASE.updateNotices); with them, an unsigned build runs with `manual` set.
+ */
 export type UpdateDisabledReason = 'unpackaged' | 'unsigned' | 'unsupported-package'
 
 export interface UpdateStatus {
@@ -35,6 +38,11 @@ export interface UpdateStatus {
   /** This version is below the release feed's supported floor (atelier-support.json). */
   unsupported: { below: string; message: string | null; snoozedUntil: number | null } | null
   disabledReason: UpdateDisabledReason | null
+  /**
+   * This build can't install updates itself (unsigned): it only announces a newer
+   * release, and updates.download() opens the page its installer is on.
+   */
+  manual: boolean
 }
 
 export interface WhatsNewEntry {
@@ -79,10 +87,11 @@ export function initialUpdateStatus(currentVersion: string): UpdateStatus {
     error: null,
     unsupported: null,
     disabledReason: 'unpackaged',
+    manual: false,
   }
 }
 
-/** The release feed's `atelier-support.json`; fetched only when RELEASE.updatesEnabled. */
+/** The release feed's `atelier-support.json`; fetched only when the build checks for updates. */
 export interface SupportFeed {
   schema: 1
   /** `below` is a semver x.y.z: every version under it is unsupported. */
@@ -110,7 +119,7 @@ export interface UpdatesServices {
   updates: {
     status(): UpdateStatus
     check(): Promise<UpdateStatus>
-    /** Starts the download when it waits for consent. */
+    /** Starts the download when it waits for consent; a `manual` build opens the release page instead. */
     download(): void
     /** Saves session state, emits update-restarting, then quits and installs. `whenIdle` waits for running work. */
     install(options?: { whenIdle?: boolean }): void
