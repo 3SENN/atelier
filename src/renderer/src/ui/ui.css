@@ -899,7 +899,8 @@ html.ui-resizing-y * {
 
 .ui-switch-row__label {
   color: var(--text-primary);
-  font-weight: 500;
+  /* The weight of a field's label, so a switch in a form reads as one of its fields. */
+  font-weight: 550;
   cursor: pointer;
 }
 

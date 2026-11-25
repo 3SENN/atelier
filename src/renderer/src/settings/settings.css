@@ -350,6 +350,22 @@
   padding: var(--space-2) var(--space-6);
 }
 
+/* A switch that is a whole row of a settings card reads like the card's other rows (.sp-row): the same
+   title, description and height, so a card mixing both looks like one list. */
+:is(.sp-card > .ui-switch-row, :is(.sp-card, .pw-card) > .sp-switch-anchor > .ui-switch-row, .sp-switch-anchor--icon > .ui-switch-row):not(:has(.ui-switch--sm)) .ui-switch-row__label {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+:is(.sp-card > .ui-switch-row, :is(.sp-card, .pw-card) > .sp-switch-anchor > .ui-switch-row, .sp-switch-anchor--icon > .ui-switch-row):not(:has(.ui-switch--sm)) .ui-switch-row__description {
+  font-size: var(--text-md);
+  line-height: 1.45;
+}
+
+:is(.sp-card > .ui-switch-row, :is(.sp-card, .pw-card) > .sp-switch-anchor > .ui-switch-row, .sp-switch-anchor--icon > .ui-switch-row):not(:has(.ui-switch--sm)):has(.ui-switch-row__description) {
+  min-height: 68px;
+}
+
 /* 54 px for a title, 68 for a title and description; 24 px sides. */
 .sp-row {
   display: flex;
@@ -461,8 +477,20 @@
   gap: var(--space-1-5);
 }
 
-.sp-field + .sp-field {
-  margin-top: var(--space-4);
+/* Fields are spaced by what holds them (a grid or flex gap). A margin of their own would add to that
+   gap and, in a row of fields, push every field after the first below its neighbours. */
+
+/* The proxy form (Settings › Network): its fields, then Revert and Apply at the end. */
+.net-proxy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.net-proxy__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }
 
 .sp-field__label {
