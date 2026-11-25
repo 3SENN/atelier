@@ -66,6 +66,13 @@ publish:
 generateUpdatesFilesForAllChannels: true
 afterPack: ./scripts/release/afterPack.mjs
 mac:
+  # onnxruntime-node (the on-device decision model's runtime) ships every platform's binaries: keep this one's.
+  # A platform's files replace the top-level list, so it repeats it.
+  files:
+    - out/**
+    - package.json
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
   category: public.app-category.productivity
   # Hardened runtime; notarized by electron-builder when the APPLE_* env is set
   # Squirrel.Mac updates from the zip, so it ships next to the dmg.
@@ -185,6 +192,14 @@ dmg:
       type: link
       path: /Applications
 win:
+  # onnxruntime-node ships every platform's binaries: keep this one's, for the arch being packed.
+  # A platform's files replace the top-level list, so it repeats it.
+  files:
+    - out/**
+    - package.json
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/!(${arch})/**"
   # Signed through CSC_LINK or Azure Trusted Signing from env
   target:
     - target: nsis
@@ -218,6 +233,14 @@ nsis:
   include: build/installer.nsh
   deleteAppDataOnUninstall: false
 linux:
+  # onnxruntime-node ships every platform's binaries: keep this one's, for the arch being packed.
+  # A platform's files replace the top-level list, so it repeats it.
+  files:
+    - out/**
+    - package.json
+    - "!node_modules/onnxruntime-node/bin/napi-v6/darwin/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/win32/**"
+    - "!node_modules/onnxruntime-node/bin/napi-v6/linux/!(${arch})/**"
   target:
     - target: AppImage
       arch: [x64]

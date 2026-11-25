@@ -267,6 +267,8 @@ describe('electron-builder.yml', () => {
       'native/haptics/build/atelier_haptics.node': 'scripts/build-native.mjs',
       'native/calendar/build/atelier-calendar': 'scripts/build-calendar-helper.mjs',
       'native/translate/build/atelier-translate': 'scripts/build-translate-helper.mjs',
+      // The on-device decision model, downloaded and checked (docs/decisions.md › On this computer).
+      'native/decisions/build': 'scripts/fetch-decision-model.mjs',
     }
     const entries = [config.extraResources, config.mac?.extraResources, config.win?.extraResources, config.linux?.extraResources]
       .flat()

@@ -351,7 +351,7 @@ describe('licence list (ST-56)', () => {
     pkg(join(root, 'node_modules', 'beta'), { name: 'beta', version: '2.0.0', licenses: [{ type: 'Apache-2.0' }], dependencies: { shared: '1' } })
     pkg(join(root, 'node_modules', 'shared'), { name: 'shared', version: '3.0.0', license: { type: 'ISC' } })
     pkg(join(root, 'node_modules', 'tooling'), { name: 'tooling', version: '1.0.0', license: 'MIT' })
-    const out = collectLicenses(root, { extra: [], native: [] }) as Array<{ name: string; license: string; text: string }>
+    const out = collectLicenses(root, { extra: [], native: [], models: [] }) as Array<{ name: string; license: string; text: string }>
     expect(out.map((e) => `${e.name}:${e.license}`)).toEqual(['alpha:MIT', 'beta:Apache-2.0', 'shared:ISC'])
     expect(out[0]?.text).toBe('MIT text')
     expect(licenseOf(null)).toBe('UNKNOWN')
