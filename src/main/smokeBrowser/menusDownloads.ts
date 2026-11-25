@@ -158,24 +158,23 @@ const menusInFreshOverlay: SmokeCheck = {
         let card: Box | null = null
         let view: Box | null = null
         const inside = (r: Box | null, v: Box | null): boolean => Boolean(r && v && r.width > 0 && r.x >= -1 && r.y >= -1 && r.x + r.width <= v.width + 1 && r.y + r.height <= v.height + 1)
+        // Settled: drawn inside the view main sized, at full size, under the button and inside the window (a
+        // first frame can draw before the renderer shifts by the view's origin, so this waits for it).
+        const settled = (r: Box | null, v: Box | null): boolean =>
+          Boolean(r && v && inside(r, v) && r.width >= c.minWidth && r.height >= 100 && v.y + r.y >= button.y + button.height && v.x + r.x + r.width <= width)
         await waitFor(
           async () => {
             card = await new Chrome(wc).js<Box | null>(`const el = document.querySelector(${JSON.stringify(c.card)}); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }`).catch(() => null)
             view = win.overlay.interactiveBounds()
-            return inside(card, view) && (card as unknown as Box).height >= 100
+            return settled(card, view)
           },
           6000,
-          `${c.surface} to draw whole`,
+          `${c.surface} to draw whole under its button`,
         ).catch(() => {
           assert(view, `${c.surface}: the overlay view is not showing`)
           assert(card, `${c.surface}: the card never drew`)
-          assert(false, `${c.surface}: the card is ${JSON.stringify(card)} in the view ${JSON.stringify(view)}`)
+          assert(false, `${c.surface}: the card is ${JSON.stringify(card)} in the view ${JSON.stringify(view)} (button bottom ${button.y + button.height}, window ${width} wide)`)
         })
-        const r = card as unknown as Box
-        const v = view as unknown as Box
-        assert(r.width >= c.minWidth, `${c.surface}: the card is ${Math.round(r.width)} px wide`)
-        assert(v.y + r.y >= button.y + button.height, `${c.surface}: the card (top ${Math.round(v.y + r.y)}) is not under the button`)
-        assert(v.x + r.x + r.width <= width, `${c.surface}: the card runs off the window's right edge`)
         closeAll()
         await waitFor(async () => !(await new Chrome(wc).js<boolean>(`return Boolean(document.querySelector(${JSON.stringify(c.card)}))`).catch(() => true)), 3000, `${c.surface} to close`)
       }
