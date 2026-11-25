@@ -12,6 +12,29 @@ import type { WhatsNewEntry } from './updates'
 // card combines every entry since the version you last saw.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    version: '1.7.0',
+    date: '2026-11-25',
+    title: `${BRAND_NAME}’s own models`,
+    highlights: [
+      {
+        title: 'Quick decisions on this computer',
+        body: `${BRAND_NAME}’s own small decision model is built in: no key, a few milliseconds a decision, and nothing leaves your computer. Turn it on in Settings › Quick decisions › On this computer.`,
+      },
+      {
+        title: 'Browser tasks, page by page',
+        body: 'Download Browser tasks in Settings › Quick decisions, and your companion hands routine stretches of a task, like checking out or filling in a form, to a small model on your computer.',
+      },
+      {
+        title: 'Your details, in one place',
+        body: 'Add your name, email, phone and address once in Settings › You. Forms offer them first, and your companion knows them for tasks you give it.',
+      },
+      {
+        title: 'Addresses come along',
+        body: 'Importing from another browser now brings your saved addresses too, never your cards, and nothing is added twice.',
+      },
+    ],
+  },
+  {
     version: '1.6.1',
     date: '2026-11-19',
     title: 'Updates work',

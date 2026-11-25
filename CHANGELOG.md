@@ -2,6 +2,15 @@
 
 All notable changes to Atelier. Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
+## 1.7.0 (2026-11-25) — Atelier’s own models
+
+- **Quick decisions on this computer.** Atelier now has its own small decision model, built in. It needs no key and no account, answers in a few milliseconds, and nothing it decides leaves your computer. Turn it on in Settings › Quick decisions › On this computer. For new kinds of questions, a larger model is an optional download there.
+- **Browser tasks, page by page.** Download Browser tasks in Settings › Quick decisions › On this computer, and your companion hands routine stretches of a task to a small model on your computer: adding something to the cart and going to checkout, filling in a form, following a search. It takes about a tenth of a second a page. Whatever it isn’t sure of goes back to your companion, and every click still asks you before buying, paying or deleting anything.
+- **Your details, in one place.** Add your name, email, phone and address once in Settings › You. Forms offer them first, and your companion knows them, so it can fill in a form or order for you without asking. They are one of your saved addresses, encrypted with your keychain, not a copy. Turn off Your companion knows these to keep them out of chats; private chats never include them.
+- **Addresses come along.** Importing from Chrome, Edge, Brave, Arc, Vivaldi or Firefox now brings your saved addresses too. Cards never come over. An address you already have isn’t added twice, and saving a form with an address you already have fills in the one you saved.
+- **Profiles say what they share.** Passwords, addresses and cards are shared by all your profiles. The Profiles page now says so, and deleting a profile no longer mentions logins it won’t delete.
+- **Reset starts setup fresh.** After Settings › Reset, setup now really starts again, without your earlier answers.
+
 ## 1.6.1 (2026-11-19) — Updates work
 
 - **Atelier updates itself.** On Mac, Atelier couldn’t check for new versions and showed Update failed: no release could update itself so far. It now finds new versions and updates itself. If you have 1.6.0 or older, download 1.6.1 once from the website; after that, updates come by themselves. (The Windows installer isn’t code-signed yet, so it doesn’t update itself; download new versions from the website.)
