@@ -12,6 +12,25 @@ import type { WhatsNewEntry } from './updates'
 // card combines every entry since the version you last saw.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    version: '1.7.1',
+    date: '2026-11-25',
+    title: 'Menus open again',
+    highlights: [
+      {
+        title: 'Menus open again',
+        body: 'Switch chat, Extensions and the site suggestion button could open as a thin line, or not at all. They now always open at full size, under the button you clicked.',
+      },
+      {
+        title: `${BRAND_NAME}’s models, by name`,
+        body: 'Settings › Quick decisions names each of your models on this computer and its version, and says when atelier-mini helps atelier-nano.',
+      },
+      {
+        title: 'Tidier forms and switches',
+        body: 'Fields side by side line up, forms are evenly spaced, and switches in Settings read like the rows around them.',
+      },
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-11-25',
     title: `${BRAND_NAME}’s own models`,

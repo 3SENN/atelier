@@ -2,6 +2,12 @@
 
 All notable changes to Atelier. Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
+## 1.7.1 (2026-11-25) — Menus open again
+
+- **Menus open again.** Switch chat, Extensions and the site suggestion button could open as a thin line or not show at all, until a full-window dialog had been open. They now always open at full size, under the button you clicked, and take your clicks.
+- **Atelier’s models, by name.** Settings › Quick decisions names each model on this computer and its version: atelier-nano, atelier-mini for new kinds of questions and atelier-step for browser tasks. Under atelier-nano it says when atelier-mini helps it. On this computer has one model, so the field for typing another model’s name is gone there.
+- **Tidier forms and switches.** In forms such as the address and card dialogs, fields side by side line up and stacked fields are evenly spaced; the proxy form in Settings › Network has its buttons at the end. Switches in Settings read like the rows around them, and a switch in a form like its other fields.
+
 ## 1.7.0 (2026-11-25) — Atelier’s own models
 
 - **Quick decisions on this computer.** Atelier now has its own small decision model, built in. It needs no key and no account, answers in a few milliseconds, and nothing it decides leaves your computer. Turn it on in Settings › Quick decisions › On this computer. For new kinds of questions, a larger model is an optional download there.
