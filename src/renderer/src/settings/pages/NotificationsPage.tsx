@@ -12,7 +12,7 @@ import { NOTIFICATION_CATEGORIES, NOTIFICATION_CATEGORY_LABELS, type Notificatio
 import type { SiteSettingsEntry } from '@shared/sites'
 import { call } from '../../api'
 import { useT, type MessageKey } from '../../i18n/useT'
-import { AsyncButton, Badge, Button, EmptyState, ErrorState, IconButton, SkeletonRows, useAsyncAction, useToast } from '../../ui'
+import { AsyncButton, Badge, Button, EmptyState, ErrorState, IconButton, SkeletonRows, Switch, useAsyncAction, useToast } from '../../ui'
 import { useResource } from '../data'
 import { Card, ListFrame, Notice, PageHeader, Section, SwitchRow } from '../kit'
 import type { SettingsPageProps } from '../pageTypes'
@@ -99,7 +99,8 @@ export function NotificationsPage({ settings, update }: SettingsPageProps): Reac
                 <span className="sp-row__icon" aria-hidden>
                   {CATEGORY_ICONS[category]}
                 </span>
-                <SwitchRow
+                {/* The icon's row is the anchor already: the switch fills the rest of it. */}
+                <Switch
                   label={t(NOTIFICATION_CATEGORY_LABELS[category])}
                   description={t(CATEGORY_DESCRIPTIONS[category])}
                   checked={n.categories[category]}

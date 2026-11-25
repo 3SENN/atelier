@@ -16,8 +16,8 @@ import { useEvent, useResource } from '../data'
 import { useT } from '../../i18n/useT'
 import '../../passwords/passwords.css'
 import { AddressDialog } from '../../passwords/WalletDialogs'
-import { Button, ErrorState, Select, SkeletonRows, Switch } from '../../ui'
-import { Card, Section } from '../kit'
+import { Button, ErrorState, Select, SkeletonRows } from '../../ui'
+import { Card, Section, SwitchRow } from '../kit'
 
 export function YourDetailsSection({ settings, onSettings }: { settings: SettingsView; onSettings(view: SettingsView): void }): ReactElement {
   const t = useT()
@@ -60,7 +60,7 @@ export function YourDetailsSection({ settings, onSettings }: { settings: Setting
                 <span className="sp-item__title">
                   <span className="sp-item__title-text">{name || mine.label}</span>
                 </span>
-                <span className="sp-item__sub">{[mine.email, mine.tel, place].filter(Boolean).join(' · ') || t('settings.you.details.onlyName')}</span>
+                <span className="sp-item__sub sp-item__sub--wrap">{[mine.email, mine.tel, place].filter(Boolean).join(' · ') || t('settings.you.details.onlyName')}</span>
               </button>
               <div className="sp-item__actions">
                 <Button size="sm" variant="ghost" icon={<Pencil />} onClick={() => setEditing(mine)}>
@@ -94,14 +94,13 @@ export function YourDetailsSection({ settings, onSettings }: { settings: Setting
             </p>
           )}
         </div>
-        <div className="sp-row" data-settings-anchor="you-details-share">
-          <Switch
-            label={t('settings.you.details.share')}
-            description={t('settings.you.details.share.description')}
-            checked={settings.shareDetails}
-            onChange={(shareDetails) => void atelier.settings.set({ shareDetails }).then(onSettings, (err: unknown) => setError(errorText(err)))}
-          />
-        </div>
+        <SwitchRow
+          anchor="you-details-share"
+          label={t('settings.you.details.share')}
+          description={t('settings.you.details.share.description')}
+          checked={settings.shareDetails}
+          onChange={(shareDetails) => void atelier.settings.set({ shareDetails }).then(onSettings, (err: unknown) => setError(errorText(err)))}
+        />
       </Card>
       <AddressDialog
         open={editing !== null}
