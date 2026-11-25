@@ -9,6 +9,7 @@ import { AddServerDialog } from '../../../connectors/AddServerDialog'
 import { LocalApprovalDialog } from '../../../connectors/LocalApprovalDialog'
 import '../../../connectors/connectors.css'
 import type { SurfaceComponentProps } from '../../types'
+import { windowViewport } from '../../host/windowSize'
 
 // The add custom server dialog (SK-15) and the local server approval (OV-09)
 // over the whole window. Add resolves with the saved connectors; the
@@ -16,7 +17,7 @@ import type { SurfaceComponentProps } from '../../types'
 
 function useFillWindow(reportBounds: (rect: { x: number; y: number; width: number; height: number }) => void): void {
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [])
 }
 

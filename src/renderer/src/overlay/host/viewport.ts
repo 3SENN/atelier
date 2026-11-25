@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-// The window's viewport for overlay surface CSS.
+// The window's viewport for overlay surface CSS (windowSize.ts has it for code).
 
 /**
  * The window's size for a surface's CSS, as --ov-vw and --ov-vh. The overlay

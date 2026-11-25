@@ -14,6 +14,7 @@ import { cx } from '../../../ui'
 import type { SurfaceComponentProps } from '../../types'
 import { askFirst, askHinted, completesInline, enterAction, enterOptions, hintQuery, type AskHint } from './enter'
 import { groupLabel, highlight } from './rows'
+import { windowViewport } from '../../host/windowSize'
 
 // The command bar (SH-35, SH-36, DS-23, DS-110): drawn over the pill in the
 // interactive overlay, so the field turns solid in place and the
@@ -285,7 +286,7 @@ export function CommandBar({ props, resolve, close, anchorRect, viewport }: Surf
   const mirror = !touched && !revealed && props.selectAll ? addressMirror(value) : null
   // The ring sits 2 px outside the pill, so the surface is 4 px wider than its anchor.
   const width = (anchorRect?.width ?? 516) + 4
-  const maxCard = Math.max(160, (viewport?.height ?? window.innerHeight) - (anchorRect?.y ?? 0) - 64)
+  const maxCard = Math.max(160, (viewport?.height ?? windowViewport().height) - (anchorRect?.y ?? 0) - 64)
   const open = rows.length > 0 || error !== null
   let index = -1
   return (

@@ -7,6 +7,7 @@ import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, typ
 import { placePopover } from '../../ui/logic/popover'
 import { cx } from '../../ui/logic/format'
 import type { Box } from './logic'
+import { windowViewport } from '../host/windowSize'
 
 // The overlay kit's card (DS-94): white (raised in dark mode), a hairline, a
 // soft shadow, radius 12 and 5 px padding. It sits below or above its anchor,
@@ -46,7 +47,7 @@ export const Popover = forwardRef<HTMLDivElement | null, KitPopoverProps>(functi
     }
     const measure = (): void => {
       const size = { width: el.offsetWidth, height: el.scrollHeight }
-      const at = placePopover(anchor, size, { width: window.innerWidth, height: window.innerHeight }, { gap, align, side })
+      const at = placePopover(anchor, size, { width: windowViewport().width, height: windowViewport().height }, { gap, align, side })
       setPlace((prev) => (prev && prev.left === at.left && prev.top === at.top && prev.maxHeight === at.maxHeight ? prev : at))
     }
     measure()

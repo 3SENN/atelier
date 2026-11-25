@@ -3,19 +3,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { ArrowUpRight, Ellipsis, Pin, PinOff, Settings2 } from 'lucide-react'
-import { EXTENSIONS_SETTINGS_URL, anchorBelow, type ExtensionInfo } from '@shared/extensions'
+import { ANCHOR_GAP, EDGE_MARGIN, EXTENSIONS_SETTINGS_URL, type ExtensionInfo } from '@shared/extensions'
 import { call, errorText } from '../api'
 import { t } from '../i18n/useT'
 import type { SurfaceComponentProps } from '../overlay/types'
 import { ErrorState, IconButton, SkeletonRows, cx } from '../ui'
 import { ExtensionBadge, ExtensionIcon } from './ExtensionIcon'
 import { useExtensions } from './useExtensions'
+import { windowViewport } from '../overlay/host/windowSize'
 import './extensions.css'
 
 // The extensions popover (SH-65, routes/55 geometry): an in-window card under
-// the toolbar's Extensions button, right edges aligned. Every extension is a
+// the toolbar's Extensions button, placed there by its overlay frame like the
+// other menus (the module's gap). Every extension is a
 // row: a click runs its action; pin or unpin sits on the row; the ⋯ button
 // opens Manage, Remove and Report a problem below it. Empty, it points to
 // the store. Arrow keys move between rows, Esc closes.
@@ -28,30 +30,16 @@ function rowsOf(root: HTMLElement | null): HTMLElement[] {
   return root ? [...root.querySelectorAll<HTMLElement>('[data-ext-row]')] : []
 }
 
-export function ExtensionsPopover({ anchor, close, resolve, reportBounds }: Props): ReactElement {
+export function ExtensionsPopover({ anchor, close, resolve }: Props): ReactElement {
   const { items, loading, error, reload } = useExtensions()
   const card = useRef<HTMLDivElement>(null)
   const [openMore, setOpenMore] = useState<string | null>(null)
   const [failure, setFailure] = useState<string | null>(null)
-  const [height, setHeight] = useState(120)
-
-  const rect = anchor.kind === 'window' ? anchor.rect : { x: window.innerWidth - 48, y: 4, width: 32, height: 32 }
-  const box = anchorBelow(rect, { width: WIDTH, height }, { width: window.innerWidth, height: window.innerHeight })
-
-  // The host sizes its view to what the card draws.
-  useLayoutEffect(() => {
-    const el = card.current
-    if (!el) return
-    const measure = (): void => {
-      setHeight(el.scrollHeight)
-      const r = el.getBoundingClientRect()
-      reportBounds({ x: r.left, y: r.top, width: r.width, height: r.height })
-    }
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [reportBounds])
+  // The frame places the card and sizes the overlay to it; the card only keeps to the room below the
+  // button, in the window (not the overlay view, which is only as big as what it shows).
+  const rect = anchor.kind === 'window' ? anchor.rect : { x: windowViewport().width - 48, y: 4, width: 32, height: 32 }
+  const below = rect.y + rect.height + ANCHOR_GAP
+  const maxHeight = Math.max(160, windowViewport().height - below - EDGE_MARGIN)
 
   // Focus lands on the first row, or the store link when the list is empty.
   useEffect(() => {
@@ -98,7 +86,7 @@ export function ExtensionsPopover({ anchor, close, resolve, reportBounds }: Prop
       className="ext-popover"
       role="dialog"
       aria-label={t('extensions.popover.title')}
-      style={{ left: box.x, top: box.y, width: box.width, maxHeight: Math.max(160, window.innerHeight - box.y - 8) }}
+      style={{ width: WIDTH, maxHeight }}
       onKeyDown={onKeyDown}
     >
       <h2 className="ext-popover__title">{t('extensions.popover.title')}</h2>

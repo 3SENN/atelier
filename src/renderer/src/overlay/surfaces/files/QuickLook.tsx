@@ -14,6 +14,7 @@ import { openViewer } from '../../../files/open'
 import { useViewerDoc } from '../../../files/useViewerDoc'
 import { Button, ErrorState, IconButton, SkeletonText, cx, toast } from '../../../ui'
 import type { SurfaceComponentProps } from '../../types'
+import { windowViewport } from '../../host/windowSize'
 import './files.css'
 
 // Quick look: a sheet over the tab with the same renderers as the
@@ -32,7 +33,7 @@ export function QuickLookSurface({ props, close, resolve, reportBounds, exiting 
   const { doc, error, loading, reload } = useViewerDoc(props.target)
 
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [])
 
   useEffect(() => {

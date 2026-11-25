@@ -13,6 +13,7 @@ import { useT } from '../../../i18n/useT'
 import { useMotion } from '../../../ui'
 import type { SurfaceComponentProps } from '../../types'
 import { ACTION_LABEL, actionCall, noticeContent, type NoticeAction } from './logic'
+import { windowViewport } from '../../host/windowSize'
 import './atWork.css'
 
 // OV-21: the floating notice over a tab the agent holds. It says which
@@ -23,7 +24,7 @@ import './atWork.css'
 
 export function AgentNotice({ props, anchorRect, viewport: shownIn, exiting }: SurfaceComponentProps<AgentNoticeProps>): ReactElement {
   // The host always passes the window's viewport; fall back to the window itself when it doesn't.
-  const viewport = shownIn ?? { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight }
+  const viewport = shownIn ?? { x: 0, y: 0, width: windowViewport().width, height: windowViewport().height }
   const t = useT()
   const { reduced } = useMotion()
   const [now, setNow] = useState(() => Date.now())

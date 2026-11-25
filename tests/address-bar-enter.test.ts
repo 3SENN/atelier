@@ -13,6 +13,16 @@ import { viewportVars } from '../src/renderer/src/overlay/host/viewport'
 // The address bar's Enter rules, and the overlay sizing that kept the
 // command bar from showing at all.
 
+function filesUnder(dir: string, ...exts: string[]): string[] {
+  const out: string[] = []
+  for (const name of readdirSync(dir)) {
+    const path = join(dir, name)
+    if (statSync(path).isDirectory()) out.push(...filesUnder(path, ...exts))
+    else if (exts.some((e) => name.endsWith(e))) out.push(path)
+  }
+  return out
+}
+
 const row = (url: string): OmniboxRow => ({ id: `typed:${url}`, group: 'typed', title: url, action: { kind: 'navigate', url } })
 
 describe('command bar Enter', () => {
@@ -48,24 +58,40 @@ describe('overlay surfaces size against the window, not the overlay view', () =>
     expect(viewportVars({ width: 0, height: 0 })).toEqual({})
   })
 
-  it('leaves no bare vw or vh in overlay CSS (the view is only as big as its surfaces)', () => {
-    const files: string[] = []
-    const walk = (dir: string): void => {
-      for (const name of readdirSync(dir)) {
-        const path = join(dir, name)
-        if (statSync(path).isDirectory()) walk(path)
-        else if (name.endsWith('.css')) files.push(path)
-      }
-    }
-    walk('src/renderer/src/overlay')
-    expect(files.length).toBeGreaterThan(5)
+  // Surfaces draw with styles from anywhere in the renderer (the chat list's live in chat/), so every
+  // stylesheet counts. Outside the overlay the fallback is the same vw or vh as before.
+  it('leaves no bare vw or vh in renderer CSS (in the overlay the view is only as big as its surfaces)', () => {
+    const files = filesUnder('src/renderer/src', '.css')
+    expect(files.length).toBeGreaterThan(40)
     const bare: string[] = []
     for (const file of files) {
       const text = readFileSync(file, 'utf8')
         .replace(/\/\*[\s\S]*?\*\//g, '')
         .replace(/var\(--ov-v([wh]), 100v\1\)/g, '')
+        // The window controls' inset reads the titlebar area of the chrome window itself.
+        .replace(/--window-controls-width:[^;]*;/g, '')
       for (const m of text.matchAll(/(?<![\w.-])\d+(?:\.\d+)?v[wh]\b/g)) bare.push(`${file}: ${m[0]}`)
     }
     expect(bare).toEqual([])
+  })
+
+  // The chat list drew 2 px tall and the Extensions card 0 px wide: both were sized by the overlay
+  // view, which main had sized to whatever showed before. Code that runs in the overlay reads the
+  // window's size from windowViewport(); openers that run in the chrome may use the window.
+  it('keeps window.innerWidth and innerHeight out of code that runs in the overlay', () => {
+    const chromeSide = new Set([
+      'src/renderer/src/overlay/kit/chromeHost.tsx',
+      'src/renderer/src/overlay/host/windowSize.ts',
+      'src/renderer/src/overlay/surfaces/menus/main-menu/open.tsx',
+      'src/renderer/src/overlay/surfaces/menus/downloads/useDownloadsPopover.ts',
+    ])
+    const files = [
+      ...filesUnder('src/renderer/src/overlay', '.ts', '.tsx'),
+      'src/renderer/src/extensions/ExtensionsPopover.tsx',
+      'src/renderer/src/extensions/Prompts.tsx',
+      'src/renderer/src/suggestions/SiteSuggestionPopover.tsx',
+    ].filter((f) => !chromeSide.has(f))
+    const found = files.filter((f) => /window\.inner(Width|Height)/.test(readFileSync(f, 'utf8')))
+    expect(found).toEqual([])
   })
 })

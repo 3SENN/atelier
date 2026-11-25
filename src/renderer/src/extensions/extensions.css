@@ -88,7 +88,7 @@
 /* ---- popover ---- */
 
 .ext-popover {
-  position: absolute;
+  position: relative;
   display: flex;
   flex-direction: column;
   width: var(--ext-popover-width);
@@ -282,7 +282,7 @@
   flex-direction: column;
   gap: 10px;
   width: min(400px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(var(--ov-vh, 100vh) - 48px);
   overflow: auto;
   padding: 20px 20px 16px;
   border-radius: var(--radius-card);

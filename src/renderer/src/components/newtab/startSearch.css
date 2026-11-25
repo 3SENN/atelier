@@ -96,7 +96,7 @@
   right: 0;
   z-index: 6;
   overflow-y: auto;
-  max-height: min(372px, 46vh);
+  max-height: min(372px, calc(var(--ov-vh, 100vh) * 0.46));
   padding: 6px;
   border-radius: 20px;
   background: var(--bg-raised);

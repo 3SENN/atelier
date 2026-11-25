@@ -7,6 +7,7 @@ import { useLayoutEffect, type ReactElement } from 'react'
 import type { ProfilesSurfaceProps } from '@shared/overlay/profiles'
 import { CreateProfileDialog, DeleteProfileDialog } from '../../../profiles/ProfileDialogs'
 import type { SurfaceComponentProps } from '../../types'
+import { windowViewport } from '../../host/windowSize'
 
 // The create and delete profile dialogs over the whole window (ST-38, ST-39).
 // Create resolves with the new profile's id (main opens its window); delete
@@ -14,7 +15,7 @@ import type { SurfaceComponentProps } from '../../types'
 
 function useFillWindow(reportBounds: (rect: { x: number; y: number; width: number; height: number }) => void): void {
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [])
 }
 

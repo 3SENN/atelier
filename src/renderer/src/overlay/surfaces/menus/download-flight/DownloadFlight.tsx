@@ -8,6 +8,7 @@ import { FLIGHT_MAX_MS, flightDuration, flightFrames, type DownloadFlightProps }
 import { motionReduced } from '../../../../ui'
 import type { SurfaceComponentProps } from '../../../types'
 import { FileKindIcon } from '../downloads/FileKindIcon'
+import { windowViewport } from '../../../host/windowSize'
 import '../downloads/downloads.css'
 
 // The fly-to-button cue (OV-19), in the passive, click-through tier: the
@@ -27,14 +28,14 @@ export function DownloadFlight({ props, close, reportBounds }: SurfaceComponentP
       close()
       return
     }
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
     const frames = flightFrames(props.from, props.to).map((f) => ({
       offset: f.offset,
       opacity: f.opacity,
       transform: `translate(${f.x - TILE / 2}px, ${f.y - TILE / 2}px) scale(${f.scale})`,
     }))
     const animation = el.animate(frames, { duration: flightDuration(props.from, props.to), easing: 'linear', fill: 'forwards' })
-    const start = { x: window.screenX, y: window.screenY, w: window.innerWidth, h: window.innerHeight }
+    const start = { x: window.screenX, y: window.screenY, w: windowViewport().width, h: windowViewport().height }
     let done = false
     const finish = (): void => {
       if (done) return
@@ -45,7 +46,7 @@ export function DownloadFlight({ props, close, reportBounds }: SurfaceComponentP
     animation.onfinish = finish
     let frame = 0
     const watch = (): void => {
-      if (window.screenX !== start.x || window.screenY !== start.y || window.innerWidth !== start.w || window.innerHeight !== start.h) return finish()
+      if (window.screenX !== start.x || window.screenY !== start.y || windowViewport().width !== start.w || windowViewport().height !== start.h) return finish()
       frame = requestAnimationFrame(watch)
     }
     frame = requestAnimationFrame(watch)

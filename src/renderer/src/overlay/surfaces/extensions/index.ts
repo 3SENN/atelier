@@ -4,6 +4,7 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { z } from 'zod'
+import { ANCHOR_GAP } from '@shared/extensions'
 import type { ExtensionsSurfaceProps } from '@shared/overlay/extensions'
 import { ExtensionsPopover } from '../../../extensions/ExtensionsPopover'
 import { InstallPrompt, NativePrompt } from '../../../extensions/Prompts'
@@ -21,6 +22,8 @@ const popover: SurfaceModule<ExtensionsSurfaceProps['extensions-popover']> = {
   component: ExtensionsPopover,
   props: z.object({}).strict() as unknown as z.ZodType<Record<string, never>>,
   policy: { ...MENU_POLICY, onTabSwitch: 'close' },
+  // 4 px under the Extensions button, as the toolbar's own menus sit.
+  gap: ANCHOR_GAP,
 }
 
 const installPrompt: SurfaceModule<ExtensionsSurfaceProps['extension-install-prompt']> = {

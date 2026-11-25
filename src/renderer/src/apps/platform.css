@@ -80,7 +80,7 @@
 .pl-list__name { font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-list__sub { color: var(--text-secondary); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.pl-gridwrap { position: relative; border: var(--hairline) solid var(--border-subtle); border-radius: var(--radius-md); overflow: auto; max-height: min(62vh, 640px); background: var(--bg-raised); } /* as tall as its rows, up to most of the window */
+.pl-gridwrap { position: relative; border: var(--hairline) solid var(--border-subtle); border-radius: var(--radius-md); overflow: auto; max-height: min(calc(var(--ov-vh, 100vh) * 0.62), 640px); background: var(--bg-raised); } /* as tall as its rows, up to most of the window */
 .pl-gridwrap:focus-visible { outline: var(--focus-ring-width) solid var(--focus-ring-color); outline-offset: var(--focus-ring-offset); }
 .pl-table { display: grid; min-width: 100%; font-size: var(--text-sm); }
 .pl-table__head { position: sticky; top: 0; z-index: 1; display: grid; background: var(--bg-subtle); border-bottom: var(--hairline) solid var(--border-default); }

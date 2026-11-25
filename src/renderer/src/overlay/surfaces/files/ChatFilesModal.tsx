@@ -16,6 +16,7 @@ import { FilePreview } from '../../../files/preview/FilePreview'
 import { useViewerDoc } from '../../../files/useViewerDoc'
 import { Button, EmptyState, ErrorState, IconButton, SkeletonRows, cx, toast, useRovingFocus } from '../../../ui'
 import type { SurfaceComponentProps } from '../../types'
+import { windowViewport } from '../../host/windowSize'
 import './files.css'
 
 // The chat files modal (CH-28): everything a chat gathered, as folders
@@ -69,7 +70,7 @@ export function ChatFilesModalSurface({ props, close, reportBounds, exiting }: S
   const onListKey = useRovingFocus(list, { selector: '.fc-row__open', orientation: 'vertical' })
 
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [])
 
   const load = useCallback(async (): Promise<void> => {

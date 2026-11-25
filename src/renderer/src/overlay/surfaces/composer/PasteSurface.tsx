@@ -10,6 +10,7 @@ import { PasteBody } from '../../../chat/composer/PastePreview'
 import '../../../chat/composer/composer.css'
 import { IconButton, cx } from '../../../ui'
 import type { SurfaceComponentProps } from '../../types'
+import { windowViewport } from '../../host/windowSize'
 
 // The paste preview as an overlay surface (CH-24): a scrim over the whole
 // window, page included, with the same body as the in-window dialog. Esc
@@ -20,7 +21,7 @@ export function PasteSurface({ props, resolve, close, reportBounds, exiting }: S
   const card = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [])
 
   useEffect(() => {

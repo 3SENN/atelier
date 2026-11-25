@@ -501,7 +501,7 @@ button.cmp-chip__main:hover {
 .cmp-paste__text {
   box-sizing: border-box;
   width: 100%;
-  height: min(52vh, 460px);
+  height: min(calc(var(--ov-vh, 100vh) * 0.52), 460px);
   margin: 0;
   padding: var(--space-3);
   overflow: auto;
@@ -547,7 +547,7 @@ button.cmp-chip__main:hover {
 }
 
 .cmp-paste-dialog {
-  width: min(720px, calc(100vw - 48px));
+  width: min(720px, calc(var(--ov-vw, 100vw) - 48px));
 }
 
 .cmp-paste-surface {

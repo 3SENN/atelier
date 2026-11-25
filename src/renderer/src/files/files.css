@@ -161,7 +161,7 @@
 .fv-frame {
   width: 100%;
   min-height: 420px;
-  height: 64vh;
+  height: calc(var(--ov-vh, 100vh) * 0.64);
   border: 1px solid var(--fv-rule);
   border-radius: var(--radius-md, 10px);
   /* The page's own paper: white in both themes is the page, not Atelier's UI. */
@@ -170,7 +170,7 @@
 
 .fv-preview--compact .fv-frame {
   min-height: 260px;
-  height: 46vh;
+  height: calc(var(--ov-vh, 100vh) * 0.46);
 }
 
 .fv-image {
@@ -187,12 +187,12 @@
 .fv-image img {
   display: block;
   max-width: 100%;
-  max-height: 70vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.7);
   object-fit: contain;
 }
 
 .fv-preview--compact .fv-image img {
-  max-height: 48vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.48);
 }
 
 .fv-media {
@@ -206,7 +206,7 @@
 
 .fv-media video {
   max-width: 100%;
-  max-height: 66vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.66);
   border-radius: var(--radius-sm, 6px);
   background: #000000;
 }
@@ -217,14 +217,14 @@
 
 .fv-sheet {
   overflow: auto;
-  max-height: 68vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.68);
   border: 1px solid var(--fv-rule);
   border-radius: var(--radius-md, 10px);
   background: var(--fv-paper);
 }
 
 .fv-preview--compact .fv-sheet {
-  max-height: 46vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.46);
 }
 
 .fv-sheet table {
@@ -339,7 +339,7 @@
 
 .fv-editor {
   width: 100%;
-  min-height: 60vh;
+  min-height: calc(var(--ov-vh, 100vh) * 0.6);
   padding: 14px;
   resize: vertical;
   border: 1px solid var(--border-default, var(--fv-rule));
@@ -430,7 +430,7 @@
 }
 
 .fv-page__state {
-  padding-top: 12vh;
+  padding-top: calc(var(--ov-vh, 100vh) * 0.12);
 }
 
 /* ── Library › Files cards ── */

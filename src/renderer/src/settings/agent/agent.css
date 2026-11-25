@@ -370,7 +370,7 @@
 }
 
 .ag-prompt__text {
-  max-height: 52vh;
+  max-height: calc(var(--ov-vh, 100vh) * 0.52);
   margin: 0;
   padding: var(--space-3);
   overflow: auto;

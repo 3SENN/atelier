@@ -129,6 +129,62 @@ const popoverOnScreen: SmokeCheck = {
   },
 }
 
+// In a freshly loaded overlay the view is as small as whatever it last showed (nothing, at start). Menus that
+// sized or placed themselves by that view drew 2 px tall (the chat list) or 0 px wide (Extensions), and the
+// user saw them flash or nothing at all. Both must open whole, on screen, under the button.
+const menusInFreshOverlay: SmokeCheck = {
+  name: 'overlay: the chat list and Extensions open whole in a freshly loaded overlay, under their button',
+  async run(ctx) {
+    const win = core()?.windows.all().find((w) => w.chrome === ctx.chrome.ui)
+    assert(win, 'the first window')
+    const surfaces = ['chat-popover', 'extensions-popover'] as const
+    const closeAll = (): void => win.overlay.closeAll((s) => (surfaces as readonly string[]).includes(s))
+    closeAll()
+    const wc = win.overlay.tierWebContents('interactive')
+    assert(wc, 'the interactive overlay')
+    wc.reload()
+    await waitFor(() => wc.isLoading(), 3000, 'the overlay to start loading')
+    await waitFor(() => !wc.isLoading(), 10_000, 'the overlay to load again')
+    const width = await ctx.chrome.js<number>('return window.innerWidth')
+    type Box = { x: number; y: number; width: number; height: number }
+    const button: Box = { x: width - 48, y: 4, width: 32, height: 32 }
+    const cases: Array<{ surface: (typeof surfaces)[number]; props: object; card: string; minWidth: number }> = [
+      { surface: 'chat-popover', props: { chatId: null, panel: null }, card: '.cd-pop', minWidth: 300 },
+      { surface: 'extensions-popover', props: {}, card: '.ext-popover', minWidth: 300 },
+    ]
+    try {
+      for (const c of cases) {
+        void win.overlay.open(c.surface, { kind: 'window', rect: button }, c.props as never).catch(() => undefined)
+        let card: Box | null = null
+        let view: Box | null = null
+        const inside = (r: Box | null, v: Box | null): boolean => Boolean(r && v && r.width > 0 && r.x >= -1 && r.y >= -1 && r.x + r.width <= v.width + 1 && r.y + r.height <= v.height + 1)
+        await waitFor(
+          async () => {
+            card = await new Chrome(wc).js<Box | null>(`const el = document.querySelector(${JSON.stringify(c.card)}); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }`).catch(() => null)
+            view = win.overlay.interactiveBounds()
+            return inside(card, view) && (card as unknown as Box).height >= 100
+          },
+          6000,
+          `${c.surface} to draw whole`,
+        ).catch(() => {
+          assert(view, `${c.surface}: the overlay view is not showing`)
+          assert(card, `${c.surface}: the card never drew`)
+          assert(false, `${c.surface}: the card is ${JSON.stringify(card)} in the view ${JSON.stringify(view)}`)
+        })
+        const r = card as unknown as Box
+        const v = view as unknown as Box
+        assert(r.width >= c.minWidth, `${c.surface}: the card is ${Math.round(r.width)} px wide`)
+        assert(v.y + r.y >= button.y + button.height, `${c.surface}: the card (top ${Math.round(v.y + r.y)}) is not under the button`)
+        assert(v.x + r.x + r.width <= width, `${c.surface}: the card runs off the window's right edge`)
+        closeAll()
+        await waitFor(async () => !(await new Chrome(wc).js<boolean>(`return Boolean(document.querySelector(${JSON.stringify(c.card)}))`).catch(() => true)), 3000, `${c.surface} to close`)
+      }
+    } finally {
+      closeAll()
+    }
+  },
+}
+
 const agentDownload: SmokeCheck = {
   name: 'downloads: an agent download never opens the popover',
   async run(ctx) {
@@ -172,7 +228,7 @@ const folderView: SmokeCheck = {
   },
 }
 
-export const downloadChecks: SmokeCheck[] = [smallDownload, popoverOnScreen, agentDownload, flaggedDownload, folderView]
+export const downloadChecks: SmokeCheck[] = [smallDownload, popoverOnScreen, menusInFreshOverlay, agentDownload, flaggedDownload, folderView]
 
 export const downloadShots: ShotSpec[] = [
   {

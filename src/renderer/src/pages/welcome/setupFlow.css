@@ -11,7 +11,7 @@
 .wlx__loading {
   display: grid;
   place-items: center;
-  min-height: 60vh;
+  min-height: calc(var(--ov-vh, 100vh) * 0.6);
 }
 
 .wlx__loading {

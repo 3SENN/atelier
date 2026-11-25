@@ -194,7 +194,7 @@
 .cx-approval__titles { flex: 1; min-width: 0; }
 .cx-approval__title { margin: 0; font-weight: 600; }
 .cx-approval__tool { font-family: var(--font-mono); font-size: 11px; }
-.cx-approval__body { display: flex; flex-direction: column; gap: var(--space-2); max-height: min(46vh, 420px); overflow-y: auto; padding-right: 2px; }
+.cx-approval__body { display: flex; flex-direction: column; gap: var(--space-2); max-height: min(calc(var(--ov-vh, 100vh) * 0.46), 420px); overflow-y: auto; padding-right: 2px; }
 .cx-approval__fields { display: flex; flex-direction: column; gap: var(--space-3); }
 .cx-approval__actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); }
 .cx-approval__hint { margin-right: auto; font-size: 12px; }

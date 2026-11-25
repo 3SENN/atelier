@@ -12,6 +12,7 @@ import { Button, cx } from '../ui'
 import { tabbables } from '../ui/layers'
 import { trapFocusIndex } from '../ui/logic/keys'
 import { ExtensionIcon } from './ExtensionIcon'
+import { windowViewport } from '../overlay/host/windowSize'
 import './extensions.css'
 
 // The install prompt (OV-16) and the native-messaging prompt: small
@@ -23,7 +24,7 @@ import './extensions.css'
 function Card({ titleId, onKeyDown, children, exiting, reportBounds }: { titleId: string; onKeyDown(e: KeyboardEvent): void; children: ReactNode; exiting: boolean; reportBounds: SurfaceComponentProps<unknown>['reportBounds'] }): ReactElement {
   const ref = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
-    reportBounds({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight })
+    reportBounds({ x: 0, y: 0, width: windowViewport().width, height: windowViewport().height })
   }, [reportBounds])
   // A modal: Tab and Shift-Tab wrap inside the card.
   const trap = (e: KeyboardEvent): boolean => {

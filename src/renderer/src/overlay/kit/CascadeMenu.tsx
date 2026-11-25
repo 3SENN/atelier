@@ -10,6 +10,7 @@ import { MenuList } from './MenuList'
 import { SEARCH_THRESHOLD, closeInnermost, openPath, placeSubmenu, unionBox, type Box } from './logic'
 import type { KitHandlers, KitItem } from './types'
 import { t } from '../../i18n/useT'
+import { windowViewport } from '../host/windowSize'
 
 // A menu whose rows open side cards (DS-94, SH-54): submenus cascade about
 // 3 px beside the parent card, each with its own scrolling list (and search
@@ -195,7 +196,7 @@ function SideCard({ level, entry, item, width, prefer, label, children, listRef,
     const el = ref.current
     if (!el) return
     const measure = (): void => {
-      const at = placeSubmenu(entry.row, entry.parent, { width: el.offsetWidth, height: el.scrollHeight }, { width: window.innerWidth, height: window.innerHeight }, { prefer })
+      const at = placeSubmenu(entry.row, entry.parent, { width: el.offsetWidth, height: el.scrollHeight }, { width: windowViewport().width, height: windowViewport().height }, { prefer })
       setPlace((p) => (p && p.left === at.left && p.top === at.top && p.maxHeight === at.maxHeight ? p : at))
     }
     measure()
