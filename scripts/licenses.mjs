@@ -47,6 +47,33 @@ export const NATIVE_PACKAGES = [
   { name: 'System.Speech', version: '8.0.0', license: 'MIT', text: mit(DOTNET_COPYRIGHT) },
   { name: '.NET Runtime', version: '8.0', license: 'MIT', text: mit(DOTNET_COPYRIGHT, 'The .NET runtime\'s third-party notices: https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT') },
 ]
+const APACHE = 'Licensed under the Apache License, Version 2.0 (the "License"); you may not use these files except in compliance with the License. You may obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0. Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.'
+/**
+ * Atelier's own decision models (docs/decisions.md › On this computer), from the atelier-decisions project
+ * (https://huggingface.co/3SENN/atelier-decisions): atelier-nano ships with Atelier, atelier-mini and atelier-step
+ * are downloads. Listed with what they are built from, so About shows where every model comes from.
+ */
+export const MODEL_LICENSES = [
+  {
+    name: 'atelier-nano (decision model)',
+    version: '0.3',
+    license: 'Apache-2.0',
+    text: `Atelier's on-device decision model, from the atelier-decisions project (v0.6). ${APACHE}\n\nBuilt from mmBERT-small (https://huggingface.co/jhu-clsp/mmBERT-small), Johns Hopkins University CLSP, under the MIT License:\n\n${mit('Copyright (c) Johns Hopkins University CLSP')}\n\nDistilled from pplx-decider-v1.3 and pplx-decider-flash-v1.3 (https://huggingface.co/perplexity-ai), Perplexity, Apache License 2.0; none of their weights are in it.`,
+  },
+  {
+    name: 'atelier-step (browser tasks, a download)',
+    version: '0.1',
+    license: 'Apache-2.0',
+    text: `atelier-step, an optional download in Settings › Quick decisions, from the atelier-decisions project (step-v0.1). ${APACHE}\n\nBuilt from atelier-nano (above). Trained on steps from Mind2Web (https://huggingface.co/datasets/osunlp/Mind2Web), The Ohio State University, CC BY 4.0, and on generated flows.`,
+  },
+  {
+    name: 'atelier-mini (decision model, a download)',
+    version: '0.6',
+    license: 'Apache-2.0',
+    text: `atelier-mini, an optional download in Settings › Quick decisions, from the atelier-decisions project (v0.6). ${APACHE}\n\nBuilt from Qwen3.5-2B (https://huggingface.co/Qwen/Qwen3.5-2B), Alibaba Cloud, Apache License 2.0: attention made non-causal, adapters trained by distillation and merged into the weights, a new readout, converted to GGUF and quantized. Run by llama.cpp's llama-server (https://github.com/ggml-org/llama.cpp, the ggml authors, MIT License), whose licence comes with the download.`,
+  },
+]
+
 /**
  * Atelier's own licences besides the MPL: the companion art (ART-LICENSE.md),
  * listed with its text so About shows it next to the packages. None when the
@@ -161,7 +188,7 @@ const byNameVersion = (a, b) => a.name.localeCompare(b.name) || a.version.locale
  * walked from node_modules either way, and the `native` helpers' packages and
  * Atelier's `own` licences (the companion art's) are added as they are.
  */
-export function collectLicenses(root, { roots, extra = EXTRA_ROOTS, native = NATIVE_PACKAGES, own = ownLicenses(root) } = {}) {
+export function collectLicenses(root, { roots, extra = EXTRA_ROOTS, native = NATIVE_PACKAGES, own = ownLicenses(root), models = MODEL_LICENSES } = {}) {
   const seen = new Map()
   const lock = roots ? null : readJson(join(root, 'package-lock.json'))
   if (lock?.packages) {
@@ -175,7 +202,7 @@ export function collectLicenses(root, { roots, extra = EXTRA_ROOTS, native = NAT
     const top = readJson(join(root, 'package.json')) ?? {}
     walk(root, roots ?? [...Object.keys(top.dependencies ?? {}), ...extra], seen)
   }
-  for (const entry of [...native, ...own]) {
+  for (const entry of [...native, ...own, ...models]) {
     const key = `${entry.name}@${entry.version}`
     if (!seen.has(key)) seen.set(key, { ...entry })
   }

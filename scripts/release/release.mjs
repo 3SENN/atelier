@@ -236,6 +236,9 @@ async function main() {
   node('scripts/kit/build.mjs', env)
   step('Building the native helpers')
   buildNative(opts.platform, env)
+  // Atelier's own decision model (docs/decisions.md › On this computer), pinned and checked by size and SHA-256.
+  step('Fetching the on-device decision model')
+  node('scripts/fetch-decision-model.mjs', env)
   step('Writing the licence list')
   node('scripts/licenses.mjs', env)
   // A release refuses a list that misses a shipped package or carries a licence Atelier can't ship.

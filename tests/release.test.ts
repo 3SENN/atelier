@@ -55,9 +55,10 @@ import { brandedConfig } from '../scripts/release/builderConfig.mjs'
 import * as licenses from '../scripts/licenses.mjs'
 
 type LicenseEntry = { name: string; version: string; license: string; text: string }
-const { NATIVE_PACKAGES, collectLicenses, licenseListProblems, licenseVerdict, ownLicenses, productionPackages } = licenses as {
+const { MODEL_LICENSES, NATIVE_PACKAGES, collectLicenses, licenseListProblems, licenseVerdict, ownLicenses, productionPackages } = licenses as {
+  MODEL_LICENSES: LicenseEntry[]
   NATIVE_PACKAGES: LicenseEntry[]
-  collectLicenses(root: string, options?: { roots?: string[]; extra?: string[]; native?: LicenseEntry[]; own?: LicenseEntry[] }): LicenseEntry[]
+  collectLicenses(root: string, options?: { roots?: string[]; extra?: string[]; native?: LicenseEntry[]; own?: LicenseEntry[]; models?: LicenseEntry[] }): LicenseEntry[]
   ownLicenses(root: string): LicenseEntry[]
   licenseVerdict(expression: unknown): 'ok' | 'denied' | 'unknown'
   licenseListProblems(list: unknown, shipped: Array<{ name: string; version: string }>): { errors: string[]; warnings: string[] }
@@ -495,11 +496,15 @@ describe('the licence list', () => {
     writeFileSync(join(root, 'package-lock.json'), JSON.stringify(lock))
     expect(productionPackages(lock).map((p) => p.name)).toEqual(['@x/canvas-win32', 'alpha', 'beta'])
     expect(productionPackages(lock, root).map((p) => `${p.name}@${p.version}`)).toEqual(['alpha@1.0.0', 'beta@2.0.0'])
-    const list = collectLicenses(root, { extra: ['react'], native: [] })
+    const list = collectLicenses(root, { extra: ['react'], native: [], models: [] })
     expect(list.map((e) => `${e.name}:${e.license}`)).toEqual(['alpha:MIT', 'beta:ISC', 'react:MIT'])
+    // Atelier's own decision models are listed by default, each with what it is built from.
+    const withModels = collectLicenses(root, { extra: ['react'], native: [] })
+    expect(withModels.filter((e) => MODEL_LICENSES.some((m) => m.name === e.name)).map((e) => e.license)).toEqual(['Apache-2.0', 'Apache-2.0', 'Apache-2.0'])
+    expect(MODEL_LICENSES.find((m) => m.name.startsWith('atelier-nano'))?.text).toMatch(/mmBERT-small.*MIT License/s)
     expect(list[0]!.text).toBe('MIT text')
     // The native helpers' packages are added as they are, in name order.
-    const withNative = collectLicenses(root, { extra: ['react'], native: [{ name: 'Native.Lib', version: '1.0.0', license: 'MIT', text: 'native text' }] })
+    const withNative = collectLicenses(root, { extra: ['react'], native: [{ name: 'Native.Lib', version: '1.0.0', license: 'MIT', text: 'native text' }], models: [] })
     expect(withNative.map((e) => e.name)).toEqual(['alpha', 'beta', 'Native.Lib', 'react'])
   })
 
