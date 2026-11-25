@@ -138,10 +138,24 @@ describe('your own address', () => {
     // Only part of it (what a shop's form had): still the same entry, nothing lost.
     expect(w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Robin', familyName: 'Vos', postalCode: '9000' }).id).toBe(first.id)
     expect(w.mine()?.line1).toBe('Kade 1')
+    // A new address that is a copy of yours, saved without saying it is yours, leaves yours marked.
+    expect(w.saveAddress({ ...robin, email: 'robin@example.com', mine: false }).id).toBe(first.id)
+    expect(w.mine()?.id).toBe(first.id)
     // Someone else at the same address, or the same person elsewhere, is a new entry.
     expect(w.saveAddress({ ...robin, givenName: 'Kim' }).id).not.toBe(first.id)
     expect(w.saveAddress({ ...robin, line1: 'Dok 7', postalCode: '9000', city: 'Gent' }).id).not.toBe(first.id)
     expect(w.addresses()).toHaveLength(3)
+  })
+
+  it('never merges on a name alone, and keeps hyphenated house numbers apart', () => {
+    const w = walletAt()
+    const sam = w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Sam', mine: true })
+    // A friend's checkout address with the same first name is someone else, not your details.
+    const friend = w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Sam', familyName: 'Peters', line1: '5 Other St', city: 'Gent' })
+    expect(friend.id).not.toBe(sam.id)
+    expect(w.mine()?.line1).toBe('')
+    const a = w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Kim', line1: 'Kerkstraat 1-3' })
+    expect(w.saveAddress({ ...EMPTY_ADDRESS, givenName: 'Kim', line1: 'Kerkstraat 13' }).id).not.toBe(a.id)
   })
 })
 

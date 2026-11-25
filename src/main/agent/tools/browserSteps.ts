@@ -36,17 +36,26 @@ const ADD_TO_CART =
   /^(add to (cart|basket|bag)|in (de |het )?(winkelwagen|winkelmand|winkelmandje)|toevoegen aan (de )?winkel(wagen|mand)|(zum|in den) warenkorb( hinzufügen| legen)?|ajouter au panier|añadir a la (cesta|carrito)|añadir al carrito)$/i
 const PRICE = /^\s*(?:€|\$|£|EUR)\s?\d|\d+(?:[.,]\d{2})?\s?(?:€|EUR)/
 /**
- * Clicks that undo or change things (removing from the cart, deleting, cancelling an account, security settings): when
- * the goal doesn't ask for one, atelier-step reaching for it is a wrong turn, so the companion decides instead of the
- * person being asked to approve it. The guard's own words, and the other languages it was trained on.
+ * Consequential clicks (paying, buying, sending, posting, deleting, account and security changes) are never atelier-
+ * step's own decision: one the goal doesn't ask for is a wrong turn, so the companion decides instead of the person
+ * being asked to approve it, whatever the approval mode. Paying always goes back. The guard's own words, and the
+ * other languages it was trained on.
  */
-const OFF_PATH: readonly ActionKind[] = ['delete', 'account', 'security']
-const DELETE_ELSEWHERE = /\b(verwijder(en)?|wissen|weghalen|l[öo]schen|entfernen|supprimer|retirer|eliminar|quitar|borrar)\b/i
-function offPath(label: string, goal: string): ActionKind | null {
-  for (const kind of OFF_PATH) {
-    const named = namesActionKind(label, kind) || (kind === 'delete' && DELETE_ELSEWHERE.test(label))
-    const asked = namesActionKind(goal, kind) || (kind === 'delete' && DELETE_ELSEWHERE.test(goal))
-    if (named && !asked) return kind
+const CONSEQUENTIAL: readonly ActionKind[] = ['payment', 'purchase', 'message', 'post', 'delete', 'account', 'security']
+const ELSEWHERE: Partial<Record<ActionKind, RegExp>> = {
+  delete: /\b(verwijder(en)?|wissen|weghalen|l[öo]schen|entfernen|supprimer|retirer|eliminar|quitar|borrar)\b/i,
+  account: /\b(sign-?ups?|registration|registreren|aanmelden|inschrijven|anmelden|registrieren|s'inscrire|inscription|registrarse)\b/i,
+  purchase: /\b(afrekenen|bestellen|kopen|kaufen|zur kasse|commander|acheter|comprar|pedido)\b/i,
+  payment: /\b(betalen|bezahlen|payer|pagar)\b/i,
+  message: /\b(verstuur|versturen|verzenden|senden|envoyer|enviar)\b/i,
+}
+function names(text: string, kind: ActionKind): boolean {
+  return namesActionKind(text.replace(/[-_]/g, ' '), kind) || Boolean(ELSEWHERE[kind]?.test(text))
+}
+export function offPath(label: string, goal: string): ActionKind | null {
+  for (const kind of CONSEQUENTIAL) {
+    if (!names(label, kind)) continue
+    if (kind === 'payment' || !names(goal, kind)) return kind
   }
   return null
 }
@@ -80,7 +89,7 @@ const DESCRIPTION = `Runs a task in a browser tab page by page with atelier-step
 
 Use it for routine stretches of a task on a site: adding a product to the cart and opening the cart, filling in a form, following a search to a result, getting through a sign-up. Give it one stretch at a time, each ending on one page, with where to stop in the goal ("add the Trailrunner 2 in size 43 to the cart and open the cart", "fill in the delivery details and continue to the payment page, stop there", "fill in the form, stop before sending"); a whole task in one goal makes it stop early. Give every value it may have to type as a named value (the person's name, email, address, phone, a size, the search words): it never makes up text, so a field nobody gave a value for is left for you.
 
-It hands the task back to you, with what it did, when it isn't sure, when the person declines a click, when it would go in circles, or when the goal looks reached. Then look at the page yourself (read_page) and carry on with your own browser tools, or call browser_steps again for the next routine stretch. It can be wrong about "done": check before you tell the person. Every click goes through the same checks and approvals as yours; buying, paying and sending always stay with the person.`
+It hands the task back to you, with what it did, when it isn't sure, when the person declines a click, when it would go in circles, when it reaches for a click the goal didn't ask for (buying, sending, deleting, an account change), before any payment, or when the goal looks reached. Then look at the page yourself (read_page) and carry on with your own browser tools, or call browser_steps again for the next routine stretch. It can be wrong about "done": check before you tell the person. Every click goes through the same checks and approvals as yours.`
 
 function pathOf(url: string): string {
   try {
@@ -111,10 +120,15 @@ function stepElements(items: StepPageItem[]): StepElement[] {
   })
 }
 
-/** The best index among the allowed ones (renormalised), when it is clearly ahead; else null. */
+/**
+ * The best index among the allowed ones (renormalised), when it is clearly ahead; else null. When the model put most
+ * of its weight on controls it may not use (a password field, a filled one), it is not sure of any allowed one either.
+ */
 function pick(ps: Array<number | null>, ok: (i: number) => boolean): number | null {
   const ranked = ps.map((p, i) => [i, p] as const).filter((x): x is readonly [number, number] => x[1] !== null && ok(x[0]))
-  const total = ranked.reduce((t, x) => t + x[1], 0) || 1
+  const all = ps.reduce<number>((t, p) => t + (p ?? 0), 0)
+  const total = ranked.reduce((t, x) => t + x[1], 0)
+  if (total <= 0 || (all > 0 && total < 0.5 * all)) return null
   const sorted = ranked.map(([i, p]) => [i, p / total] as const).sort((x, y) => y[1] - x[1])
   const [first, second] = sorted
   return first && clear(first[1], second?.[1] ?? 0) ? first[0] : null
@@ -129,13 +143,18 @@ function valueOf(probs: number[] | null): number | null | undefined {
   return first[0] === 0 ? null : first[0] - 1
 }
 
-function optionFor(options: readonly string[], value: string): string | null {
-  const v = value.trim().toLowerCase()
-  return options.find((o) => o.toLowerCase() === v) ?? options.find((o) => o.toLowerCase().includes(v) || (o.length > 1 && v.includes(o.toLowerCase()))) ?? null
+/** The option a value names: the same text, else one that holds the value as whole words (or the other way round); never a few letters inside a word ("M" is not "Small"). */
+export function optionFor(options: readonly string[], value: string): string | null {
+  const plain = (s: string): string => s.trim().toLowerCase().replace(/\s+/g, ' ')
+  const v = plain(value)
+  if (!v) return null
+  const words = (hay: string, needle: string): boolean => new RegExp(`(^|[^\\p{L}\\p{N}])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|[^\\p{L}\\p{N}])`, 'u').test(hay)
+  return options.find((o) => plain(o) === v) ?? options.find((o) => words(plain(o), v)) ?? options.find((o) => plain(o).length > 1 && words(v, plain(o))) ?? null
 }
 
 const q = (s: string): string => `“${s.length > 60 ? `${s.slice(0, 59)}…` : s}”`
-const declined = (err: unknown): boolean => err instanceof Error && /declined the action/i.test(err.message)
+/** The person said no: declined an approval, or stopped its countdown. */
+const declined = (err: unknown): boolean => err instanceof Error && /declined the action|you stopped this action/i.test(err.message)
 
 interface Ending {
   status: BrowserStepsStatus
@@ -188,14 +207,14 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
     try {
       for (let n = 1; n <= max; n++) {
         if (ctx.signal.aborted) return end({ status: 'stopped', reason: 'Stopped.', note: '' })
-        let read = await browser.page(tabId)
+        let read = await browser.page(tabId, ctx.signal)
         tabId = read.tabId
         if (!read.page) return handBack('this tab has no page atelier-step can read (a blank tab or a PDF)', 'There was no page to work on.')
         let key = `${read.url}\n${JSON.stringify(read.page.items.map((i) => [i.ref, i.label, i.value, i.checked]))}`
         if (key === lastKey && n > 1) {
           // Pages that render after the load event: one more look before calling it unchanged.
           await sleep(SETTLE_MS)
-          read = await browser.page(tabId)
+          read = await browser.page(tabId, ctx.signal)
           if (!read.page) return handBack('the tab has no readable page any more', 'The page went away.')
           key = `${read.url}\n${JSON.stringify(read.page.items.map((i) => [i.ref, i.label, i.value, i.checked]))}`
         }
@@ -229,7 +248,7 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
           if (!target) return handBack('atelier-step isn’t sure which control to click next', 'Not sure what to click next.')
           if (refused.has(target.label)) return handBack(`the person said no to ${q(target.label)} before`, `You said no to ${q(target.label)}.`)
           const off = offPath(target.label, task.goal)
-          if (off) return handBack(`atelier-step reached for ${q(target.label)} (a ${off} click the goal doesn’t ask for); decide the next step yourself`, `It reached for ${q(target.label)}; your companion decides instead.`)
+          if (off) return handBack(`atelier-step reached for ${q(target.label)} (a ${off} click${off === 'payment' ? ', which it never makes' : ' the goal doesn’t ask for'}); decide the next step yourself`, `It reached for ${q(target.label)}; your companion decides instead.`)
           const adds = ADD_TO_CART.test(target.label.trim())
           if (adds && added) return handBack(`it would add a second item to the cart (${q(target.label)})`, 'It would add a second item to the cart.')
           if (circling(`click|${target.label}|${target.context ?? ''}|${pathOf(read.url)}`)) return handBack(`it was going in circles (clicking ${q(target.label)} again)`, 'It was going in circles.')

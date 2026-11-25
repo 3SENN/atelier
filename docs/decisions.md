@@ -237,8 +237,11 @@ where to stop, the values to type) and atelier-step takes it page by page throug
   here, never in routines. Each page is read by the page bridge's `stepPage` (controls and short text lines in page
   order, with their references and the form or page region each belongs to). An operation is taken at 0.6, a control
   or a value when it is at least 0.5 and 1.5 times the next one.
+  - **Read**: each page through the site rules (as read_page) and the pause, so a blocked site is never read.
   - **Click**: through the chat's own `left_click` (AgentSession.chatBrowser), so the pause, site rules, click guard
-    and approvals are the agent's own.
+    and approvals are the agent's own. A consequential click (paying, buying, sending, posting, deleting, an account
+    or security change, by the guard's words and their Dutch, German, French and Spanish ones) goes back to the
+    companion unless the goal asks for it, whatever the approval mode; paying always does.
   - **Type**: into an empty field, then every other empty field of the same form or region it is sure of, through
     `form_input`. The header's search box is never filled along with a checkout form, and password, card and
     one-time-code fields never.

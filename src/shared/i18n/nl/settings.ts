@@ -669,7 +669,7 @@ export const settings = {
   'settings.you.details.loading': 'Je gegevens laden',
   'settings.you.details.error': 'Je gegevens konden niet worden gelezen',
   'settings.you.details.share': 'Je companion kent ze',
-  'settings.you.details.share.description': 'Nieuwe chats krijgen ze mee, zodat je companion formulieren kan invullen en dingen voor je kan bestellen zonder het te vragen. Ze gaan samen met je berichten naar het model dat je gebruikt; privéchats krijgen ze nooit.',
+  'settings.you.details.share.description': 'Nieuwe chats krijgen ze mee, zodat je companion formulieren kan invullen en dingen voor je kan bestellen zonder het te vragen. Ze gaan met je berichten naar het model dat je gebruikt en blijven in die chats staan, zoals de rest van het gesprek; een wijziging geldt voor nieuwe chats. Privéchats krijgen ze nooit.',
   'settings.you.none': 'Geen',
   'settings.you.optionalASquareCrop': 'Optioneel. Een vierkante uitsnede van een PNG, JPEG, WebP of GIF, bewaard op deze computer. Je kunt er ook een hierheen slepen.',
   'settings.you.picture': 'Foto',

@@ -220,16 +220,16 @@ export interface AddressImportResult {
 const ADDRESS_KEYS = Object.keys(EMPTY_ADDRESS) as (keyof AddressInput)[]
 
 /** The entry as the wallet takes it; a phone or email it won't take is left out rather than the whole address. */
+/** The address as the wallet takes it; a phone or email it refuses is left out on its own, keeping the rest. */
 function acceptable(a: AddressInput): AddressInput | null {
-  try {
-    return validateAddress(a)
-  } catch {
+  for (const attempt of [a, { ...a, tel: '' }, { ...a, email: '' }, { ...a, tel: '', email: '' }]) {
     try {
-      return validateAddress({ ...a, tel: '', email: '' })
+      return validateAddress(attempt)
     } catch {
-      return null
+      // Try without the field that may be the problem.
     }
   }
+  return null
 }
 
 /**

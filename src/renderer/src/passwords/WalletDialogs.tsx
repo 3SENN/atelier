@@ -77,7 +77,9 @@ export function AddressDialog({ open, editing, mine = false, onClose, onSaved }:
     setBusy(true)
     setError(null)
     try {
-      onSaved(await call('wallet', 'saveAddress', { ...form, mine: isMine, ...(editing ? { id: editing.id } : {}) }))
+      // `mine` goes along only when it says something: yours, or an edit that unmarks your own address.
+      const mark = isMine ? { mine: true } : editing?.mine ? { mine: false } : {}
+      onSaved(await call('wallet', 'saveAddress', { ...form, ...mark, ...(editing ? { id: editing.id } : {}) }))
     } catch (err) {
       setError(errorText(err))
       setBusy(false)

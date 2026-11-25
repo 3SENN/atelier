@@ -111,9 +111,17 @@ describe('atelier-step’s download', () => {
     expect(requests.sort()).toEqual([...STEP_FILES].sort())
     expect(readFileSync(join(target, 'step.json'))).toEqual(bodies.get('step.json'))
     expect(released).toBe(1)
-    installer.remove()
+    // A newer Atelier expects a newer version: the old folder counts as not installed, and is replaced by its download.
+    const next = new MiniInstaller({ dir: target, manifest: { ...manifest, version: 'step-test-2' }, download, release: () => released++, needsServer: false, installed: deviceStepDir })
+    expect(next.dir()).toBeNull()
+    expect(next.status().state).toBe('absent')
+    await next.install()
+    expect(next.dir()).toBe(target)
+    expect(JSON.parse(readFileSync(join(target, 'version.json'), 'utf8'))).toEqual({ version: 'step-test-2' })
+    expect(existsSync(join(target, 'downloading.json'))).toBe(false)
+    next.remove()
     expect(existsSync(target)).toBe(false)
-    expect(installer.status().state).toBe('absent')
+    expect(next.status().state).toBe('absent')
   })
 
   it('leaves a folder set from outside alone', () => {

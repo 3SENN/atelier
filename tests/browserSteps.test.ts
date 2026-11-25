@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import type { BrowserStepsCard, StepPageItem } from '../src/shared/browserSteps'
 import type { StepAnswer } from '../src/main/decisions/device/step'
 import type { StepInput } from '../src/main/decisions/device/stepFormat'
-import { createBrowserStepsTool, type StepModel } from '../src/main/agent/tools/browserSteps'
+import { createBrowserStepsTool, offPath, optionFor, type StepModel } from '../src/main/agent/tools/browserSteps'
 import type { ClientToolContext } from '../src/main/agent/tools/registry'
 import type { ChatBrowser } from '../src/main/agent/session'
 
@@ -218,6 +218,44 @@ describe('browser_steps', () => {
     const h3 = harness([cart()], [() => answer(2, { op: { click: 0.9 }, click: { 0: 0.9, 1: 0.1 } }), () => answer(2, { op: { done: 0.9 } })])
     await h3.run({ goal: 'Remove the tent from the cart' })
     expect(h3.steps).toEqual([{ name: 'left_click', ref: 'c1' }])
+  })
+
+  it('matches options by whole words, never by a few letters inside a word', () => {
+    const sizes = ['Small', 'Medium', 'Large']
+    expect(optionFor(sizes, 'M')).toBeNull()
+    expect(optionFor(sizes, 'medium')).toBe('Medium')
+    expect(optionFor(['EU 42', 'EU 43', 'EU 44'], '43')).toBe('EU 43')
+    expect(optionFor(['Netherlands', 'Belgium'], 'The Netherlands')).toBe('Netherlands')
+    expect(optionFor(['4', '43', '430'], '43')).toBe('43')
+    expect(optionFor(['Afval niet opgehaald', 'Losliggende stoeptegel'], 'our green bin was not emptied')).toBeNull()
+  })
+
+  it('leaves consequential clicks to the companion unless the goal asks for them, and paying always', () => {
+    expect(offPath('Pay now', 'Pay for the order')).toBe('payment')
+    expect(offPath('Betalen', 'Bestel het en betaal')).toBe('payment')
+    expect(offPath('Checkout', 'Add the tent to the cart and open the cart')).toBe('purchase')
+    expect(offPath('Checkout', 'Open the cart and go to checkout')).toBeNull()
+    expect(offPath('Send', 'Fill in the form, stop before sending')).toBe('message')
+    expect(offPath('Sign up', 'Get through the sign-up')).toBeNull()
+    expect(offPath('Register', 'Finish the registration form')).toBeNull()
+    expect(offPath('Register', 'Find the opening hours')).toBe('account')
+    expect(offPath('Accept all', 'Find the opening hours')).toBeNull()
+    expect(offPath('Add to cart', 'Find a tent')).toBeNull()
+  })
+
+  it('isn’t sure of a field when the model’s weight is on one it may not fill', async () => {
+    const login: Page = {
+      title: 'Sign in',
+      url: 'https://shop.test/login',
+      items: [
+        { ref: 's1', role: 'field', label: 'Search', value: '', group: 'header-1' },
+        { ref: 's2', role: 'field', label: 'Password', value: '', group: 'form-2', guarded: true },
+      ],
+    }
+    const h = harness([login], [() => answer(2, { op: { type: 0.9 }, type: { 0: 0.03, 1: 0.97 }, values: { 0: [0.05, 0.95] } })])
+    const out = await h.run({ goal: 'Sign in', values: [{ name: 'search', value: 'tent' }] })
+    expect(h.steps).toEqual([])
+    expect(out.content).toMatch(/isn’t sure which field/)
   })
 
   it('keeps context only where training had it: repeated labels and prices', async () => {

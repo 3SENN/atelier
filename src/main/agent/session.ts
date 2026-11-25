@@ -295,7 +295,7 @@ function savedDraft(summary: ChatSummary): DraftSetup {
 /** A chat's browser as a client tool drives it (AgentSession.chatBrowser). */
 export interface ChatBrowser {
   step(name: string, input: unknown, signal: AbortSignal): Promise<Awaited<ReturnType<BrowserToolExecutor['execute']>>>
-  page(tabId?: string | null): ReturnType<BrowserToolExecutor['stepPage']>
+  page(tabId: string | null | undefined, signal: AbortSignal): ReturnType<BrowserToolExecutor['stepPage']>
 }
 
 /** One chat's conversation with the agent: its fixed setup, history, queue and approvals. */
@@ -941,7 +941,12 @@ export class AgentSession {
   chatBrowser(): ChatBrowser {
     return {
       step: (name, input, signal) => this.#browserStep(name, input, signal),
-      page: (tabId) => this.executor.stepPage(tabId),
+      // Reading waits while paused too, and an interrupt ends it, as a browser step does.
+      page: async (tabId, signal) => {
+        const step = this.#interrupt ? AbortSignal.any([signal, this.#interrupt.signal]) : signal
+        await this.#gate.wait(step)
+        return this.executor.stepPage(tabId, step)
+      },
     }
   }
 

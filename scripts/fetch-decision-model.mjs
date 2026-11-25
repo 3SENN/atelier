@@ -14,7 +14,7 @@
 // A local folder (student/export.py) is copied as it is. Exits non-zero when neither works, so `npm run package`
 // ships without the model and says so.
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -51,6 +51,8 @@ if (source) {
     copyFileSync(join(source, f), join(out, f))
     bytes += statSync(join(out, f)).size
   }
+  // An optional file the export doesn't have (a calibration left from the pinned download) belongs to another model.
+  for (const f of OPTIONAL) if (!existsSync(join(source, f))) rmSync(join(out, f), { force: true })
 } else {
   for (const [f, pin] of Object.entries(PINNED)) {
     const path = join(out, f)

@@ -22,7 +22,7 @@ Everything lives in Atelier's data folder (`~/Library/Application Support/Atelie
   removed. Crash dumps are written only when you turn crash reports on, and stay on this computer.
 
 Importing from another browser only reads that browser's files on this computer and changes nothing there; saved
-addresses go into the encrypted wallet, and payment cards are never read.
+addresses go into the encrypted wallet, and payment cards are never imported (their tables are never queried).
 
 Settings › Reset clears your data and settings. Uninstalling the app leaves the data folder; delete it by hand to
 remove everything.
@@ -31,7 +31,7 @@ remove everything.
 
 | Service | Why | When | What is sent |
 |---|---|---|---|
-| **Your model provider**: Anthropic (`api.anthropic.com`), or your organisation's gateway when a policy sets one | The companion: chats, routines, memory, meeting summaries, quick asks, translation with the companion | When you have added a key and use the companion | Your messages and what the companion needs for them: the page and tab content it reads, attachments, the tools it may use, and your key. Your name, email, phone and address from Settings › You go into new chats unless you turn "Your companion knows these" off there; private chats never include them. Anthropic's SDK adds the OS, architecture and runtime version. Anthropic's privacy policy applies to what it receives |
+| **Your model provider**: Anthropic (`api.anthropic.com`), or your organisation's gateway when a policy sets one | The companion: chats, routines, memory, meeting summaries, quick asks, translation with the companion | When you have added a key and use the companion | Your messages and what the companion needs for them: the page and tab content it reads, attachments, the tools it may use, and your key. Your name, email, phone and address from Settings › You go into new chats unless you turn "Your companion knows these" off there, and each such chat keeps them with its conversation on this computer; changing them or turning that off applies to new chats. Private chats never include them. Anthropic's SDK adds the OS, architecture and runtime version. Anthropic's privacy policy applies to what it receives |
 | **Your Claude subscription**: Claude Code, Anthropic's own program on your computer | The companion, as above, when you choose your Claude subscription as the engine | Only when you choose it in Settings › Model and key | Atelier hands your messages and what the companion needs for them to Claude Code on your computer, and Claude Code sends them to Anthropic under your own Claude account, under Anthropic's terms and privacy policy. Atelier never sees or stores your Claude sign-in |
 | Anthropic's **web search and web fetch** tools | Searching the web and reading pages for the companion | During chats, while web tools are on (the default) | Search queries and addresses, run on Anthropic's side |
 | **Quick-decision providers** you add (Typesafe, OpenRouter, Experiential Labs, OpenAI, or your own server) | Fast decisions, such as what a new-tab entry means | Off unless you add a provider and a key | The short text being decided on, and your key |

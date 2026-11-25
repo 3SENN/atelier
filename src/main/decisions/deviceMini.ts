@@ -4,7 +4,7 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { createHash } from 'node:crypto'
-import { chmodSync, createReadStream, createWriteStream, mkdirSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs'
+import { chmodSync, createReadStream, createWriteStream, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs'
 import { once } from 'node:events'
 import { dirname, join, normalize, sep } from 'node:path'
 import type { MiniStatus } from '@shared/decisions'
@@ -86,10 +86,15 @@ export class MiniInstaller {
     return this.#o.base || this.#o.manifest.base
   }
 
-  /** The installed folder, or null. */
+  /**
+   * The installed folder, or null. A folder of another version than the manifest's (Atelier updated, the model not
+   * yet) counts as not installed, so it is never run with code that expects the new one, and Settings offers the
+   * download again. A folder set from outside is used as it is.
+   */
   dir(): string | null {
-    if (this.#o.installed) return this.#o.installed(this.#o.dir)
-    return deviceMiniDir(this.#o.dir, (this.#o.platform?.split('-')[0] as NodeJS.Platform | undefined) ?? process.platform)
+    const found = this.#o.installed ? this.#o.installed(this.#o.dir) : deviceMiniDir(this.#o.dir, (this.#o.platform?.split('-')[0] as NodeJS.Platform | undefined) ?? process.platform)
+    if (!found || this.#o.external) return found
+    return versionOf(found) === this.#o.manifest.version ? found : null
   }
 
   status(): MiniStatus {
@@ -117,7 +122,10 @@ export class MiniInstaller {
     this.#error = null
     const staging = `${this.#o.dir}.partial`
     try {
+      // What a stopped download of another version left is no use to this one: start it over.
+      if (versionOf(staging, PARTIAL_VERSION) !== this.#o.manifest.version) rmSync(staging, { recursive: true, force: true })
       mkdirSync(staging, { recursive: true })
+      writeFileSync(join(staging, PARTIAL_VERSION), JSON.stringify({ version: this.#o.manifest.version }))
       const free = freeBytes(staging)
       const have = files.reduce((s, f) => s + Math.min(f.size, sizeOf(join(staging, f.path))), 0)
       if (free !== null && free < total - have + SPARE) throw new Error(`Not enough free disk space (${Math.ceil((total - have + SPARE) / 1e6)} MB needed)`)
@@ -126,6 +134,7 @@ export class MiniInstaller {
         if (process.platform !== 'win32' && f.path.startsWith('server/')) chmodSync(join(staging, f.path), 0o755)
       }
       writeFileSync(join(staging, 'version.json'), JSON.stringify({ version: this.#o.manifest.version }))
+      rmSync(join(staging, PARTIAL_VERSION), { force: true })
       this.#o.release()
       rmSync(this.#o.dir, { recursive: true, force: true })
       renameSync(staging, this.#o.dir)
@@ -215,6 +224,19 @@ async function write(
   } finally {
     out.end()
     await once(out, 'close')
+  }
+}
+
+/** Which version a staged download is for (removed once it is swapped in). */
+const PARTIAL_VERSION = 'downloading.json'
+
+/** The version an installed (or staged) folder says it holds, from its version.json; null when it says none. */
+function versionOf(dir: string, file = 'version.json'): string | null {
+  try {
+    const v = (JSON.parse(readFileSync(join(dir, file), 'utf8')) as { version?: unknown }).version
+    return typeof v === 'string' ? v : null
+  } catch {
+    return null
   }
 }
 

@@ -33,7 +33,8 @@ import type { VaultCipher } from './vault'
 //
 // One address can be yours (`mine`): your own name, email, phone and address,
 // shown in Settings › You and used first by autofill and your companion. It is
-// the one place Atelier keeps those details; nothing else holds a copy.
+// the one place Atelier keeps them as details; a chat started while your
+// companion knows them keeps them in its instructions, like the rest of it.
 
 interface StoredAddress extends Address {
   updatedAt: number
@@ -105,18 +106,24 @@ function addressView(a: StoredAddress, mine: string): AddressView {
 }
 
 const ADDRESS_KEYS = Object.keys(EMPTY_ADDRESS) as (keyof AddressInput)[]
-const norm = (s: string): string => s.normalize('NFKC').toLowerCase().replace(/[\s.,-]+/g, '')
+/** Case, spaces, dots and commas don't tell two values apart; hyphens do ("Kerkstraat 1-3" is not "Kerkstraat 13"). */
+const norm = (s: string): string => s.normalize('NFKC').toLowerCase().replace(/[\s.,]+/g, '')
+/** Fields that pin an address down: two entries agreeing only on a name are two people or two places. */
+const STRONG: readonly (keyof AddressInput)[] = ['line1', 'postalCode', 'email', 'tel']
 
 /**
- * The saved address a new one is a copy of, so saving it fills that one in instead of adding a twin: every field
- * the two both have agrees, and they share the person (or organisation) and the street, or one is the other with
- * fields left out. An autofill offer, an import or your details saved again never leave two entries for one place.
+ * The saved address a new one is a copy of, so saving it fills that one in instead of adding a twin: every field the
+ * two both have agrees, at least one of those is a street, postcode, email or phone, and either they share the person
+ * (or organisation) and the street, or one is the other with fields left out. An autofill offer, an import or your
+ * details saved again never leave two entries for one place, and a sparse entry (only a first name) never swallows
+ * someone else's address.
  */
 export function sameAddress(saved: readonly AddressInput[], next: AddressInput): number {
   const filled = (a: AddressInput): (keyof AddressInput)[] => ADDRESS_KEYS.filter((k) => a[k].trim() !== '')
   return saved.findIndex((x) => {
     const both = ADDRESS_KEYS.filter((k) => x[k].trim() !== '' && next[k].trim() !== '')
     if (both.length === 0 || !both.every((k) => norm(x[k]) === norm(next[k]))) return false
+    if (!both.some((k) => STRONG.includes(k))) return false
     const who = (a: AddressInput): string => norm(`${a.givenName}${a.familyName}`) || norm(a.organization)
     const shareWhoAndWhere = who(x) !== '' && who(x) === who(next) && norm(x.line1) !== '' && norm(x.line1) === norm(next.line1)
     const subset = filled(next).every((k) => x[k].trim() !== '') || filled(x).every((k) => next[k].trim() !== '')
@@ -193,9 +200,10 @@ export class WalletStore implements Wallet {
     const fields = validateAddress(a)
     return this.#change((data) => {
       const now = this.#now().getTime()
+      // Only an edit of your own address that says so unmarks it: a new address merged into yours never does.
       const mark = (id: string): void => {
         if (a.mine === true) data.mine = id
-        else if (a.mine === false && data.mine === id) data.mine = ''
+        else if (a.mine === false && a.id === id && data.mine === id) data.mine = ''
       }
       if (a.id) {
         const index = data.addresses.findIndex((x) => x.id === a.id)

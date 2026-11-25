@@ -694,7 +694,7 @@ export const settings = {
   'settings.you.details.loading': 'Loading your details',
   'settings.you.details.error': 'Your details couldn’t be read',
   'settings.you.details.share': 'Your companion knows these',
-  'settings.you.details.share.description': 'New chats include them, so your companion can fill in forms and order things for you without asking. They go to the model you use along with your messages; private chats never include them.',
+  'settings.you.details.share.description': 'New chats include them, so your companion can fill in forms and order things for you without asking. They go to the model you use with your messages and stay in those chats like the rest of the conversation; a change applies to new chats. Private chats never include them.',
   'settings.you.none': 'None',
   'settings.you.optionalASquareCrop': 'Optional. A square crop of any PNG, JPEG, WebP or GIF, kept on this computer. You can also drop one here.',
   'settings.you.picture': 'Picture',
