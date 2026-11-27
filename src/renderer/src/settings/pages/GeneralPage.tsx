@@ -74,6 +74,20 @@ export function GeneralPage({ settings, update, tabId }: SettingsPageProps): Rea
               onChange={(c) => void update({ tabSleepMinutes: c === 'never' ? null : Number(c) })}
             />
           </Row>
+          <SwitchRow
+            anchor="memory-saver"
+            label={t('settings.general.memorySaver')}
+            description={t('settings.general.memorySaver.description')}
+            checked={settings.memorySaver}
+            onChange={(memorySaver) => void update({ memorySaver })}
+          />
+          <SwitchRow
+            anchor="energy-saver"
+            label={t('settings.general.energySaver')}
+            description={t('settings.general.energySaver.description')}
+            checked={settings.energySaver}
+            onChange={(energySaver) => void update({ energySaver })}
+          />
         </Card>
       </Section>
       <NetworkSection settings={settings} update={update} tabId={tabId} />

@@ -95,6 +95,26 @@ describe('the on-device decision model', () => {
     device.dispose()
   })
 
+  it('lets the helper go when memory is short, unless a question is waiting on it', async () => {
+    let started = 0
+    let answers = false
+    const helpers: FakeHelper[] = []
+    const device = new DeviceDecisions({ modelDir: () => dir, spawner: () => (started++, helpers.push(new FakeHelper(() => (answers ? { type: 'result', reply } : 'silent'))), helpers.at(-1)!) })
+    expect(device.releaseIdle()).toBe(false) // nothing runs yet
+    device.warm()
+    expect(device.releaseIdle()).toBe(false) // the warm-up is still waiting
+    expect(helpers[0]!.killed).toBe(false)
+    device.restart()
+    answers = true
+    device.warm()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(device.releaseIdle()).toBe(true)
+    expect(helpers[1]!.killed).toBe(true)
+    device.warm() // the next question starts it again
+    expect(started).toBe(3)
+    device.dispose()
+  })
+
   it('reads as not installed without its files: nothing starts and the provider says so', async () => {
     let started = 0
     const device = new DeviceDecisions({ modelDir: () => null, spawner: () => (started++, new FakeHelper(() => ({}))) })

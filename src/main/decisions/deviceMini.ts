@@ -4,7 +4,7 @@
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
 import { createHash } from 'node:crypto'
-import { chmodSync, createReadStream, createWriteStream, mkdirSync, readFileSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs'
+import { chmodSync, createReadStream, createWriteStream, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs'
 import { once } from 'node:events'
 import { dirname, join, normalize, sep } from 'node:path'
 import type { MiniStatus } from '@shared/decisions'
@@ -100,6 +100,30 @@ export class MiniInstaller {
     const found = this.#o.installed ? this.#o.installed(this.#o.dir) : deviceMiniDir(this.#o.dir, (this.#o.platform?.split('-')[0] as NodeJS.Platform | undefined) ?? process.platform)
     if (!found || this.#o.external) return found
     return versionOf(found) === this.#o.manifest.version ? found : null
+  }
+
+  /**
+   * Removes what an older version left on disk and says how many bytes that freed. A folder of another version is
+   * never run (dir() above), so until the new one is downloaded it is only weight: the larger model is 1.3 GB.
+   * A stopped download of another version goes too; one of this version stays, to be picked up where it stopped.
+   */
+  tidy(): number {
+    if (this.#o.external || this.#job) return 0
+    let freed = 0
+    const stale = (folder: string, marker?: string): void => {
+      const version = versionOf(folder, marker)
+      if (version === null || version === this.#o.manifest.version) return
+      const bytes = folderBytes(folder)
+      rmSync(folder, { recursive: true, force: true })
+      freed += bytes
+    }
+    try {
+      stale(this.#o.dir)
+      stale(`${this.#o.dir}.partial`, PARTIAL_VERSION)
+    } catch {
+      // In use or not ours to remove: it stays, and the next start tries again.
+    }
+    return freed
   }
 
   status(): MiniStatus {
@@ -242,6 +266,15 @@ function versionOf(dir: string, file = 'version.json'): string | null {
     return typeof v === 'string' ? v : null
   } catch {
     return null
+  }
+}
+
+/** The bytes of every file under a folder (0 when it can't be read). */
+function folderBytes(dir: string): number {
+  try {
+    return readdirSync(dir, { withFileTypes: true }).reduce((sum, e) => sum + (e.isDirectory() ? folderBytes(join(dir, e.name)) : sizeOf(join(dir, e.name))), 0)
+  } catch {
+    return 0
   }
 }
 

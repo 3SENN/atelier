@@ -3,7 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
+import { execFile } from 'node:child_process'
+import { powerMonitor } from 'electron'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { AutoGroupResult, SplitServiceAdditions, TabServices, TabsServiceAdditions } from '@shared/services/tabs'
 import { UI } from '@shared/ipc'
@@ -22,6 +25,7 @@ import { MediaSessions } from '../mediaSessions'
 import { AutoPip } from '../pip'
 import { chatIdOf } from '../tabState'
 import { EDITED_FORMS_SCRIPT, TabSleeper, canSleep } from '../tabSleep'
+import { ResourceWatch, onResourceChange, readPressure, resourceState, setResourceWatch, sleepMinutesNow } from '../resourceSaver'
 import { isServing } from '../packs/serving'
 import { TearOff } from '../tearOff'
 import { SETTLE_MS, ThumbnailCache } from '../thumbnails'
@@ -324,6 +328,30 @@ export const tabsFeature: Feature = {
     })
     // The ghost is pre-created once the app is up, so the first drag shows it at once (smoke runs skip it).
     if (!ctx.smoke && process.versions.electron) setTimeout(() => tearOff?.prewarm(), 3000).unref?.()
+    // The memory and energy savers (resourceSaver.ts) go by the computer's memory pressure and its power source.
+    // Smoke runs keep the state where no saver applies, so a run's tabs sleep by the setting alone.
+    if (!ctx.smoke && process.versions.electron) {
+      const watch = new ResourceWatch({
+        pressure: () =>
+          readPressure({
+            platform: process.platform,
+            sysctl: (name) => new Promise((resolve, reject) => execFile('/usr/sbin/sysctl', ['-n', name], { timeout: 2000 }, (err, out) => (err ? reject(err) : resolve(out)))),
+            meminfo: () => readFile('/proc/meminfo', 'utf8'),
+            system: () => process.getSystemMemoryInfo(),
+          }),
+        onBattery: () => powerMonitor.isOnBatteryPower(),
+        onPower: (listener) => {
+          powerMonitor.on('on-battery', listener)
+          powerMonitor.on('on-ac', listener)
+          return () => {
+            powerMonitor.off('on-battery', listener)
+            powerMonitor.off('on-ac', listener)
+          }
+        },
+      })
+      setResourceWatch(watch)
+      watch.start()
+    }
     return windowServices(ctx, focusedWindow)
   },
   window(win): ServiceParts {
@@ -349,8 +377,13 @@ export const tabsFeature: Feature = {
 
     const pip = win.kind === 'popup' ? null : new AutoPip({ tabs, enabled: () => ctx.settings.get().autoPictureInPicture })
 
+    // The person's setting, brought forward while memory is short or on battery (resourceSaver.ts).
+    const sleepMinutes = (): number | null => {
+      const s = ctx.settings.get()
+      return sleepMinutesNow(s.tabSleepMinutes, resourceState(), { memorySaver: s.memorySaver, energySaver: s.energySaver })
+    }
     const sleeper = new TabSleeper({
-      minutes: () => ctx.settings.get().tabSleepMinutes,
+      minutes: sleepMinutes,
       candidates: (now) => {
         const split = tabs.split()
         const active = tabs.activeId()
@@ -372,7 +405,7 @@ export const tabsFeature: Feature = {
               lastActiveAt: t.lastActiveAt,
             },
             now,
-            ctx.settings.get().tabSleepMinutes,
+            sleepMinutes(),
           )
         }).map((t) => t.id)
       },
@@ -382,6 +415,12 @@ export const tabsFeature: Feature = {
         return (await wc.executeJavaScriptInIsolatedWorld(FORMS_WORLD, [{ code: EDITED_FORMS_SCRIPT }])) === true
       },
       sleep: (id) => tabs.sleep(id),
+    })
+
+    // Memory running short, or the power cable coming out: don't wait for the next minute's check.
+    const offResources = onResourceChange((state, before) => {
+      if (state.pressure !== 'normal' && state.pressure !== before.pressure) void sleeper.check()
+      else if (state.onBattery && !before.onBattery) void sleeper.check()
     })
 
     const parts: WindowParts = {
@@ -394,6 +433,7 @@ export const tabsFeature: Feature = {
         media.delete(win.id)
         tabs.setMediaSource(null)
         pip?.dispose()
+        offResources()
         sleeper.dispose()
       },
     }

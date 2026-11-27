@@ -122,6 +122,10 @@ export const settings = {
   'settings.general.tabSleep': 'Put unused tabs to sleep',
   'settings.general.tabSleep.description': 'A sleeping tab frees its memory and reloads when you come back to it.',
   'settings.general.tabSleep.never': 'Never',
+  'settings.general.memorySaver': 'Memory saver',
+  'settings.general.memorySaver.description': 'When your computer runs short of memory, tabs in the background sleep within minutes, and what is only kept loaded for speed is let go.',
+  'settings.general.energySaver': 'Energy saver',
+  'settings.general.energySaver.description': 'On battery, tabs in the background sleep after half an hour at most and nothing is loaded before you need it.',
   'settings.general.tabSleep.minutes': '{count, plural, one {After # minute} other {After # minutes}}',
   'settings.general.tabSleep.hours': '{count, plural, one {After # hour} other {After # hours}}',
 

@@ -90,6 +90,8 @@ export const SETTINGS = defineSettings({
   mediaCard: { scope: 'app', schema: z.boolean(), default: false },
   nowPlayingButton: { scope: 'app', schema: z.boolean(), default: true }, // MD-01
   tabSleepMinutes: { scope: 'app', schema: z.number().int().min(5).max(1440).nullable(), default: 120 },
+  memorySaver: { scope: 'app', schema: z.boolean(), default: true }, // resourceSaver.ts
+  energySaver: { scope: 'app', schema: z.boolean(), default: true },
   proxy: {
     scope: 'app',
     schema: z.object({ mode: z.enum(['system', 'direct', 'manual', 'pac']), http: z.string().max(512), https: z.string().max(512), socks: z.string().max(512), pacUrl: z.string().max(2048), bypass: z.string().max(2048) }).strict(),
