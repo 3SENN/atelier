@@ -217,6 +217,16 @@ export class DeviceDecisions {
     this.#stop()
   }
 
+  /**
+   * Stops the helper when nothing is waiting on it, and says whether it did. For when the computer is critically
+   * short of memory (resourceSaver.ts): the models are only kept loaded for speed, and the next question loads them again.
+   */
+  releaseIdle(): boolean {
+    if (!this.#proc || this.#pending.size > 0) return false
+    this.#stop()
+    return true
+  }
+
   dispose(): void {
     this.#stop()
   }

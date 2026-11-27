@@ -328,6 +328,10 @@ export interface Settings extends ExtraEngineSettings {
   nowPlayingButton: boolean
   /** Minutes before a background tab sleeps; null never. */
   tabSleepMinutes: number | null
+  /** Background tabs sleep sooner while the computer is short of memory (resourceSaver.ts). */
+  memorySaver: boolean
+  /** On battery, background tabs sleep within half an hour and nothing loads ahead of use. */
+  energySaver: boolean
   blockThirdPartyCookies: boolean
   globalPrivacyControl: boolean
   clearOnExit: { cookies: boolean; cache: boolean; history: boolean }

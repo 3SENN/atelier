@@ -17,6 +17,8 @@ describe('settings fields', () => {
       confirmCloseTabs: true,
       keepAwake: false,
       tabSleepMinutes: 120,
+      memorySaver: true,
+      energySaver: true,
       popupBlocking: true,
       proxy: { mode: 'system', bypass: '<local>' },
       density: 'comfortable',

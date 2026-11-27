@@ -18,6 +18,7 @@ import type { FetchLike } from './client'
 import { DeviceDecisions, deviceModelDir, deviceStepDir, deviceVisionDir, onnxRuntimeHere, setDeviceSteps } from './device'
 import { MINI_MANIFEST } from './device/miniManifest'
 import { STEP_MANIFEST } from './device/stepManifest'
+import { mayPreload, onResourceChange, resourceState, shouldRelease } from '../resourceSaver'
 import { VISION_MANIFEST } from './device/visionManifest'
 import { MiniInstaller } from './deviceMini'
 import { DecisionKeys, KEYS_FILE } from './keys'
@@ -249,10 +250,29 @@ export function createDecisionsFeature(): Feature {
       // With the on-device model among your models, it loads in the background once Atelier has started.
       const warm = setTimeout(() => {
         const s = app.settings.get().decisions
+        const all = app.settings.get()
+        // Not on battery or while memory is short, with the savers on: the first question then loads it, a second later.
+        if (!mayPreload(resourceState(), { memorySaver: all.memorySaver, energySaver: all.energySaver })) return
         if (s.on && s.models.some((m) => PROVIDER_DEFAULTS[m.provider as keyof typeof PROVIDER_DEFAULTS]?.keyUrl === '')) device.warm()
       }, 10_000)
       warm.unref?.()
       stops.push(() => clearTimeout(warm))
+      // A model folder an Atelier update made out of date is never run again: it goes a minute after start, not at it.
+      const tidy = setTimeout(() => {
+        for (const [name, i] of [['mini', installer], ['step', steps], ['vision', vision]] as const) {
+          const freed = i.tidy()
+          if (freed > 0) log.info('decisions', 'An outdated on-device model was removed', { model: name, megabytes: Math.round(freed / 1e6) })
+        }
+      }, 60_000)
+      tidy.unref?.()
+      stops.push(() => clearTimeout(tidy))
+      // Critically short of memory: the helper and its models (up to 2 GB with the larger one) go when nothing is waiting.
+      stops.push(
+        onResourceChange((state) => {
+          const all = app.settings.get()
+          if (shouldRelease(state, { memorySaver: all.memorySaver, energySaver: all.energySaver }) && device.releaseIdle()) log.info('decisions', 'The on-device models were let go: memory is short')
+        }),
+      )
       registerLabelItems()
       // A key never outlives its server: one left by a server removed while a save failed goes now.
       try {

@@ -236,6 +236,28 @@ The engine is MPL-2.0; the parts, rigs, face layers, presets and their recipes a
 - **Off-screen rendering:** `renderCompanionImage` draws a still to a PNG for preset thumbnails and, on macOS, the optional Dock icon.
 - **Performance and fallbacks:** files are fetched and parsed once and cloned per view; rendering pauses off-screen and in hidden windows, small views run at 30 fps, and reduced motion slows clips and skips the wave. The agent panel's small view frames head and shoulders. Without WebGL or assets, a 2D face in a tinted circle is drawn instead.
 
+## Staying light
+
+A browser's weight is mostly the pages it keeps open, then what it keeps loaded to be quick, then what it leaves on
+disk. Each has one owner, and everything heavy is off until it is asked for.
+
+| What | How it stays light | Where |
+|---|---|---|
+| Background tabs | A tab in the background sleeps after `tabSleepMinutes` (two hours unless set otherwise): its page is discarded and comes back with its history when selected. Pinned, audible, capturing, agent-controlled tabs and tabs with edited forms never sleep. Restored tabs load only when first shown. | `tabSleep.ts`, `tabs.ts` sleep and wake |
+| Memory saver (`memorySaver`, on) | While the computer is short of memory, background tabs sleep after 10 minutes, and after 2 when it is critical, also when tab sleep is set to never; at critical the on-device models are let go when nothing waits on them. The reading is the operating system's own: macOS's memory pressure level, Linux's `MemAvailable`, Windows' available physical memory (under 12% or 1 GB is short, under 5% or 400 MB critical), asked every half minute. "Free" memory is not used: a healthy Mac reports almost none. | `resourceSaver.ts` |
+| Energy saver (`energySaver`, on) | On battery, background tabs sleep after half an hour at most, and the on-device model is not loaded ahead of the first question. | `resourceSaver.ts`, `decisions/feature.ts` |
+| On-device models | Optional downloads apart from the 54 MB one that ships. One helper process holds them; each model loads at its first use, and the whole helper stops after five minutes without a question. A model folder an update made out of date is removed a minute after start instead of waiting for the new download. | `decisions/device.ts`, `deviceMini.ts` tidy |
+| Other helpers | Translation stops after five idle minutes, connector servers after ten, PDF and table workers after each request, hidden tool windows after one to five minutes. | `translate/helper.ts`, `connectors/localServers.ts` |
+| Animations | The companion, the ambient field and the new-tab floor stop drawing while their window is hidden. | `companion/view.ts`, `ui/AmbientField.tsx` |
+| Disk | Logs rotate at 2 MB, five kept. History keeps 5,000 entries, closed tabs 50, activity screenshots 30 days. Settings › Storage shows what each kind takes and clears it. Chromium sizes its own HTTP cache from the free disk space; there is no second cap on top. | `diagnostics/logger.ts`, `coreStorage.ts` |
+
+The task manager (⇧Esc) shows what every tab and helper holds right now.
+
+Both savers only bring forward what already happens to a background tab, so nothing new can be lost by them, and
+each has its switch in Settings › General › Tabs. Not done, on purpose: pages are not prerendered or preconnected
+ahead of a click (it trades memory, battery and privacy for speed), and Chromium's own throttling of background
+timers and occluded windows is left on everywhere except tabs the agent is driving.
+
 ## Security model
 
 | Concern | Atelier |
