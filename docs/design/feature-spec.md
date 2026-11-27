@@ -528,7 +528,7 @@ The experiments page (atelier://flags) is reachable by URL only.
 
 ### About Atelier
 
-- <a id="st-56"></a>✅ **About page.** The version (with a skeleton while loading), check for updates with the automatic download switch (signed, packaged builds only; unsigned and development builds can't update themselves, so they leave it out), a link to Atelier's website, open-source licences and acknowledgements, and report a problem (⇧⌘H, [OV-30](#ov-30)).
+- <a id="st-56"></a>✅ **About page.** The version (with a skeleton while loading), check for updates with the automatic download switch (signed, packaged builds only; an unsigned release build can't update itself, so it checks, says when a newer version is out and links to its download, without the switch; development builds leave all of it out), a link to Atelier's website, open-source licences and acknowledgements, and report a problem (⇧⌘H, [OV-30](#ov-30)).
 
 ### Experiments
 
@@ -636,7 +636,7 @@ The experiments page (atelier://flags) is reachable by URL only.
 
 ## Updates
 
-- <a id="up-01"></a>✅ **Background update checks.** States: idle, checking, downloading, ready, installing and error. Atelier checks at start-up, every few hours and on wake, retrying network failures with backoff up to five times. A download starts only after a free-space check, on your go-ahead or automatically if a setting allows it. macOS installs on quit, and the menu item's label follows the state. Releases come from GitHub through `electron-updater`, which needs signing.
+- <a id="up-01"></a>✅ **Background update checks.** States: idle, checking, downloading, ready, installing and error. Atelier checks at start-up, every few hours and on wake, retrying network failures with backoff up to five times. A download starts only after a free-space check, on your go-ahead or automatically if a setting allows it. macOS installs on quit, and the menu item's label follows the state. Releases come from GitHub through `electron-updater`, which needs signing. An unsigned macOS or Windows release build only announces: it compares its version with the latest release's feed on the same schedule, and its pill, menu items and About row open that release's page, where the person downloads the installer.
 - <a id="up-02"></a>✅ **Update prompts and install.** A manual check reports up to date, couldn't check, downloading, or ready with restart now or later. When an update is ready, the sidebar's Update pill and a main-menu banner offer to install it, and a what's-new card appears after updating, in the bottom-right corner of the window in front. It stays until you close it (✕, Got it or Esc), never takes focus or blocks menus, follows the window's size, and comes back on the next window or start when Atelier closed it for you (its window closed, a quit). Installing saves pending state, shows a restart card, then quits and installs, with a watchdog and retry if the updater fails. An optional static list in the release feed can mark versions unsupported, prompting an update with a snooze that survives restarts.
 
 ## Diagnostics

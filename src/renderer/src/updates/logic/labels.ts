@@ -10,7 +10,7 @@ import { formatRelative } from '../../ui/logic/time'
 // What the update pill and About's update section show for a status. Pure,
 // so every state's wording is unit-tested; the components only draw it.
 
-/** Unpackaged and unsigned builds hide every update control (ST-56). */
+/** Unpackaged builds, and unsigned ones that don't announce updates, hide every update control (ST-56). */
 export function updatesVisible(status: UpdateStatus | null): status is UpdateStatus {
   return status !== null && status.disabledReason !== 'unpackaged' && status.disabledReason !== 'unsigned'
 }
@@ -62,7 +62,7 @@ export function pillHint(kind: PillKind, status: UpdateStatus): string {
     case 'downloading':
       return t('updates.pill.downloadingHint', { version })
     case 'available':
-      return t('updates.pill.availableHint', { version })
+      return t(status.manual ? 'updates.pill.availableManualHint' : 'updates.pill.availableHint', { version })
     case 'ready':
       return t('updates.pill.readyHint', { version })
     case 'installing':
@@ -123,7 +123,9 @@ export function aboutView(status: UpdateStatus, now: number, deferred = false): 
       }
     }
     case 'idle':
-      if (status.awaitingConsent && status.version) return { line: { text: t('updates.about.available', { version }), detail: null, tone: 'accent', busy: false }, buttons: ['download'], progress: null }
+      if (status.awaitingConsent && status.version) {
+        return { line: { text: t('updates.about.available', { version }), detail: status.manual ? t('updates.about.availableManual') : null, tone: 'accent', busy: false }, buttons: ['download'], progress: null }
+      }
       if (status.lastCheck === 'up-to-date' && status.checkedAt !== null) {
         return { line: { text: t('updates.about.upToDate'), detail: t('updates.about.checkedAt', { time: formatRelative(status.checkedAt, now) }), tone: 'success', busy: false }, buttons: ['check'], progress: null }
       }

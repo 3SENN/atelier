@@ -47,6 +47,11 @@ export interface ControllerDeps {
   askRestart(running: UpdateRestartRunning, version: string | null): Promise<'now' | 'when-idle' | null>
   /** The unsupported prompt: 'update', 'later', or null when dismissed. */
   askUnsupported(below: string, message: string | null): Promise<'update' | 'later' | null>
+  /**
+   * Set when this build can't install updates itself (unsigned): a newer release is
+   * only announced, never downloaded, and download() opens the page it is on.
+   */
+  openDownload?(version: string): void
   /** The release feed's atelier-support.json, or null. Only called when updates are enabled. */
   supportFeed(): Promise<SupportFeed | null>
   entries: readonly WhatsNewEntry[]
@@ -91,7 +96,7 @@ export class UpdateController {
 
   constructor(deps: ControllerDeps) {
     this.#d = deps
-    this.#status = { ...initialUpdateStatus(deps.currentVersion), disabledReason: deps.disabledReason ?? 'unpackaged' }
+    this.#status = { ...initialUpdateStatus(deps.currentVersion), disabledReason: deps.disabledReason ?? 'unpackaged', manual: deps.openDownload !== undefined }
     this.#scheduler = new CheckScheduler({
       clock: deps.clock,
       check: (reason) => void this.#scheduledCheck(reason),
@@ -222,6 +227,11 @@ export class UpdateController {
 
   /** The person's go-ahead when autoDownloadUpdates is off (or a retry that should download). */
   download(): void {
+    if (this.#d.openDownload) {
+      if (this.#status.awaitingConsent && this.#status.version) this.#d.openDownload(this.#status.version)
+      else if (this.#status.phase === 'idle' || this.#status.phase === 'error') void this.#check(true)
+      return
+    }
     this.#consent = true
     if (this.#status.awaitingConsent && this.#status.version) void this.#startDownload(this.#status.version)
     else if (this.#status.phase === 'idle' || this.#status.phase === 'error') void this.#check(true)
@@ -229,6 +239,7 @@ export class UpdateController {
 
   /** autoDownloadUpdates turned on while an update waits. */
   autoDownloadChanged(on: boolean): void {
+    if (this.#d.openDownload) return
     if (on && this.#status.awaitingConsent && this.#status.version) void this.#startDownload(this.#status.version)
   }
 
@@ -422,7 +433,7 @@ export class UpdateController {
     b.on('checking', () => this.#dispatch({ type: 'checking' }))
     b.on('available', ({ version, size }) => {
       this.#size = size
-      const consent = this.#consent || this.#d.autoDownload()
+      const consent = !this.#d.openDownload && (this.#consent || this.#d.autoDownload())
       this.#dispatch({ type: 'available', version, at: this.#d.clock.now(), awaitingConsent: !consent })
       this.#networkFailures = 0
       this.#settleCheck()

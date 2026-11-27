@@ -6,6 +6,10 @@ All notable changes to Atelier. Versions follow [semantic versioning](https://se
 
 - **Pictures, on this computer.** Download Pictures in Settings › Quick decisions › On this computer, and a model on your computer looks at pictures for your companion. Browser tasks can now use buttons that are only an icon, such as a cart, a search or a close button the page gives no name: the model names them from how they look, and leaves alone the ones it isn’t sure of. Your companion can also sort or check many pictures on a page at once, such as which album a photo belongs in or which attachments are receipts, and find the ones that fit a description, in a fraction of a second each. The model only chooses among the answers it is given and writes nothing; whatever it isn’t sure of goes back to your companion. Nothing it looks at leaves your computer.
 
+## 1.7.2 (2026-11-25) — Windows tells you about updates
+
+- **Atelier on Windows tells you about new versions.** The Windows installer isn’t code-signed yet, so Atelier can’t update itself there. It now checks for new versions, at start and every few hours, and shows Get update when one is out. The button opens the download page, and you run the installer; your windows, tabs and settings stay. Settings › About says when Atelier is up to date and has Check for updates, as on Mac. If you have 1.7.1 or older on Windows, download 1.7.2 once from the website; after that, Atelier tells you.
+
 ## 1.7.1 (2026-11-25) — Menus open again
 
 - **Menus open again.** Switch chat, Extensions and the site suggestion button could open as a thin line or not show at all, until a full-window dialog had been open. They now always open at full size, under the button you clicked, and take your clicks.

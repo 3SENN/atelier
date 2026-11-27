@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at https://mozilla.org/MPL/2.0/. */
 
-import { powerMonitor, type WebContents } from 'electron'
+import { powerMonitor, shell, type WebContents } from 'electron'
 import { menus, registerMenuContribution } from '@shared/menuModel'
 import { log } from '../log'
 import { network } from '../network'
@@ -71,6 +71,21 @@ export async function showWhatsNewIfDue(win: WindowContext | null): Promise<bool
   return seen
 }
 
+/**
+ * Opens the release page for a build that only announces updates: in a tab of the browser window in
+ * front, else of any other one (never a popup or a chat window), else with the system's handler.
+ */
+function openReleasePage(windows: { focused(): WindowContext | null; all(): WindowContext[] }, url: string): void {
+  const usable = (w: WindowContext | null): w is WindowContext => Boolean(w && !w.window.isDestroyed() && (w.kind === 'normal' || w.kind === 'private'))
+  const front = windows.focused()
+  const win = usable(front) ? front : windows.all().find(usable)
+  if (!win) return void shell.openExternal(url).catch((err: unknown) => log.warn('updates', "Couldn't open the release page", { error: err instanceof Error ? err.message : String(err) }))
+  if (win.window.isMinimized()) win.window.restore()
+  win.window.show()
+  win.window.focus()
+  win.tabs.create(url)
+}
+
 function whenLoaded(wc: WebContents, fn: () => void): void {
   if (wc.isDestroyed()) return
   if (!wc.isLoading()) fn()
@@ -91,6 +106,7 @@ export const updatesFeature: Feature = {
       chats: ctx.maintenance.chats,
       broadcast: (event) => ctx.broadcast(event),
       windows: ctx.windows,
+      openPage: (url) => openReleasePage(ctx.windows, url),
       smoke: ctx.smoke,
     })
     runtime = rt
