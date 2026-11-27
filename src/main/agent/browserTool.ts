@@ -15,6 +15,8 @@ import type { WebContents } from 'electron'
 import { z } from 'zod'
 import type { ElementDescription, FormInputResult, ResolvedElement } from '@shared/ipc'
 import type { StepPage } from '@shared/browserSteps'
+import type { Picture } from '../decisions/device/visionPreprocess'
+import { pictureOf } from '../decisions/pictures'
 import { isAppRunUrl, isBlankUrl, originOf, parseAgentNavigation, parseInternalUrl } from '@shared/url'
 import { isArtifactUrl } from '@shared/files'
 import { isExtensionUrl } from '@shared/extensions'
@@ -647,13 +649,86 @@ export class BrowserToolExecutor implements ToolHandler {
    * person's. A blank tab or a PDF has none. Reading goes through the site rules like read_page: a site the person
    * blocked is refused before anything of it is read.
    */
-  async stepPage(tabId: string | null | undefined, signal: AbortSignal): Promise<{ tabId: string; title: string; url: string; page: StepPage | null }> {
+  async stepPage(
+    tabId: string | null | undefined,
+    signal: AbortSignal,
+    options: { pictures?: boolean } = {},
+  ): Promise<{ tabId: string; title: string; url: string; page: StepPage | null; pictures?: Record<string, Picture> }> {
     const tab = this.#tab(tabId)
     const wc = tab.view.webContents
     await this.#deps.gate?.('read_page', wc.getURL() || null, describeToolCall('read_page', { tab_id: tab.id }), signal)
     if (isBlank(tab) || (await this.#pdfOf(tab))) return { tabId: tab.id, title: wc.getTitle(), url: wc.getURL(), page: null }
     const page = await this.#deps.bridge.request<StepPage>(wc, { op: 'stepPage' })
-    return { tabId: tab.id, title: wc.getTitle(), url: wc.getURL(), page }
+    const pictures = options.pictures ? await this.#unnamedPictures(tab, page) : undefined
+    return { tabId: tab.id, title: wc.getTitle(), url: wc.getURL(), page, ...(pictures ? { pictures } : {}) }
+  }
+
+  /**
+   * A picture of one thing on the page, for atelier-vision to answer questions about (the companion's label_pictures,
+   * agent/tools/labelPictures.ts): the element a reference names, scrolled into view, or with no reference the page
+   * as it shows. Through the site rules like read_page, and with the same masking as a screenshot: a guarded field
+   * (a password, a card number) is covered in it.
+   */
+  async elementPicture(tabId: string | null | undefined, ref: string | null, signal: AbortSignal): Promise<{ tabId: string; picture: Picture; name: string }> {
+    const tab = this.#tab(tabId)
+    const wc = tab.view.webContents
+    await this.#deps.gate?.('read_page', wc.getURL() || null, describeToolCall('read_page', { tab_id: tab.id }), signal)
+    await this.#visibleTab(tab.id)
+    const { width, height } = tab.view.getBounds()
+    let rect: Electron.Rectangle | undefined
+    let name = 'the page'
+    if (ref) {
+      const resolved = await this.#deps.bridge.request<ResolvedElement>(wc, { op: 'resolveRef', ref, scrollIntoView: true })
+      // The scroll has to be drawn before the capture.
+      await this.#deps.bridge.request(wc, { op: 'frame' }, 2_000).catch(() => undefined)
+      const zoom = wc.getZoomFactor()
+      const x = Math.max(0, Math.floor(resolved.box.x * zoom))
+      const y = Math.max(0, Math.floor(resolved.box.y * zoom))
+      rect = { x, y, width: Math.min(width, Math.ceil((resolved.box.x + resolved.box.width) * zoom)) - x, height: Math.min(height, Math.ceil((resolved.box.y + resolved.box.height) * zoom)) - y }
+      if (rect.width < 8 || rect.height < 8) throw new Error(`${ref} is too small or not in view to take a picture of.`)
+      name = `${ref} (${resolved.role}${resolved.name ? ` ${JSON.stringify(truncate(resolved.name, 60))}` : ''})`
+    }
+    const picture = pictureOf(await maskForAgent(tab.id, await capture(wc, rect), rect))
+    if (!picture) throw new Error('Could not take a picture of it.')
+    return { tabId: tab.id, picture, name }
+  }
+
+  /**
+   * The pictures of the controls the page gave no name (a button with only an icon), by their reference, for
+   * atelier-vision to name (docs/decisions.md › Pictures). Each is the control's own box with a few pixels of page
+   * around it, which is how the model was shown buttons. A tab that can't be captured right now gives none, and
+   * those controls stay out of the step as before.
+   */
+  async #unnamedPictures(tab: Tab, page: StepPage): Promise<Record<string, Picture> | undefined> {
+    const unnamed = page.items.filter((i) => i.box && !i.label && i.ref)
+    if (unnamed.length === 0 || this.#deps.tabs.isChromeDrawn(tab)) return undefined
+    const wc = tab.view.webContents
+    try {
+      await this.#deps.bridge.request(wc, { op: 'frame' }, 2_000)
+    } catch {
+      return undefined
+    }
+    // CSS pixels to the view's own (the other way round from #toCss).
+    const zoom = wc.getZoomFactor()
+    const { width, height } = tab.view.getBounds()
+    const out: Record<string, Picture> = {}
+    for (const item of unnamed) {
+      const box = item.box
+      if (!box) continue
+      const x = Math.max(0, Math.floor(box.x * zoom) - UNNAMED_MARGIN)
+      const y = Math.max(0, Math.floor(box.y * zoom) - UNNAMED_MARGIN)
+      const rect = { x, y, width: Math.min(width, Math.ceil((box.x + box.width) * zoom) + UNNAMED_MARGIN) - x, height: Math.min(height, Math.ceil((box.y + box.height) * zoom) + UNNAMED_MARGIN) - y }
+      if (rect.width < 8 || rect.height < 8) continue
+      try {
+        const picture = pictureOf(await maskForAgent(tab.id, await wc.capturePage(rect), rect))
+        if (picture) out[item.ref] = picture
+        else break
+      } catch {
+        // Not capturable now: the rest wouldn't be either.
+        break
+      }
+    }
+    return Object.keys(out).length > 0 ? out : undefined
   }
 
   async #readPage(input: MemberInput<'read_page'>): Promise<ResultBlock[]> {
@@ -749,6 +824,9 @@ export class BrowserToolExecutor implements ToolHandler {
 // ---- helpers ----
 
 /** Captures the view, retrying briefly while the compositor warms up. */
+/** Page around an unnamed control in its picture, in the view's pixels (the model was shown 0 to 8). */
+const UNNAMED_MARGIN = 3
+
 async function capture(wc: WebContents, rect?: Electron.Rectangle): Promise<Electron.NativeImage> {
   let lastError: unknown = null
   for (let attempt = 0; attempt < 4; attempt++) {

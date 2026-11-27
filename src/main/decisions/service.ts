@@ -164,6 +164,8 @@ export interface DecisionsDeps {
   mini?: { status(): MiniStatus; readonly version?: string }
   /** atelier-step's download state (browser tasks), shown in Settings next to the mini. */
   step?: { status(): MiniStatus; readonly version?: string }
+  /** atelier-vision's download state (pictures), shown next to them. */
+  vision?: { status(): MiniStatus; readonly version?: string }
   now?: () => number
 }
 
@@ -397,6 +399,7 @@ export class Decisions implements Decider {
       differed: this.#differed,
       ...(this.#d.mini ? { mini: this.#d.mini.status(), miniVersion: this.#d.mini.version } : {}),
       ...(this.#d.step ? { step: this.#d.step.status(), stepVersion: this.#d.step.version } : {}),
+      ...(this.#d.vision ? { vision: this.#d.vision.status(), visionVersion: this.#d.vision.version } : {}),
     }
   }
 

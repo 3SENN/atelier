@@ -104,6 +104,8 @@ export const decisions = {
   'decisions.device.mini.failed': 'De download is niet afgerond: {error}',
   'decisions.device.step': 'Taken in de browser',
   'decisions.device.step.description': 'Een klein model dat de taken van je companion in de browser pagina voor pagina afhandelt, zoals iets bestellen of een formulier invullen, in ongeveer een tiende seconde per pagina op deze computer. Waar het niet zeker van is, betalen en elke klik waar de taak niet om vroeg, gaan terug naar je companion, en elke klik gaat langs dezelfde controles en goedkeuringen als die van je companion zelf.',
+  'decisions.device.vision': 'Afbeeldingen',
+  'decisions.device.vision.description': 'Een model dat op deze computer naar afbeeldingen kijkt. Het vertelt taken in de browser wat een knop met alleen een icoon doet, en het sorteert en controleert afbeeldingen op een pagina voor je companion: foto’s, bonnetjes, schermafbeeldingen. Het antwoordt door te kiezen uit de antwoorden die het krijgt en schrijft niets; waar het niet zeker van is, gaat terug naar je companion. Een afbeelding kost een fractie van een seconde, en niets verlaat deze computer.',
   'decisions.provider.typesafe': 'TypeSafe Jev',
   'decisions.provider.openrouter': 'OpenRouter',
   'decisions.provider.experiential': 'Experiential Labs',

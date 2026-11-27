@@ -102,6 +102,8 @@ export const decisions = {
   'decisions.device.mini.failed': 'The download didn’t finish: {error}',
   'decisions.device.step': 'Browser tasks',
   'decisions.device.step.description': 'A small model that takes your companion’s tasks in the browser page by page, like ordering something or filling in a form, in about a tenth of a second a page on this computer. Whatever it isn’t sure of, paying, and any click the task didn’t ask for go back to your companion, and every click passes the same checks and approvals as your companion’s own.',
+  'decisions.device.vision': 'Pictures',
+  'decisions.device.vision.description': 'A model that looks at pictures on this computer. It tells browser tasks what a button with only an icon does, and it sorts and checks pictures on a page for your companion: photos, receipts, screenshots. It answers by choosing among the answers it is given and writes nothing; whatever it isn’t sure of goes back to your companion. A picture takes a fraction of a second, and nothing leaves this computer.',
   'decisions.provider.typesafe': 'TypeSafe Jev',
   'decisions.provider.openrouter': 'OpenRouter',
   'decisions.provider.experiential': 'Experiential Labs',

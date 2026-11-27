@@ -120,6 +120,8 @@ export const CLIENT_TOOL_OWNERS = {
   label_items: 'decisions',
   // docs/decisions.md › Browser tasks: atelier-step takes a browser task page by page on this computer.
   browser_steps: 'decisions',
+  // docs/decisions.md › Pictures: atelier-vision answers questions about pictures on a page, on this computer.
+  label_pictures: 'decisions',
 } as const
 
 const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/

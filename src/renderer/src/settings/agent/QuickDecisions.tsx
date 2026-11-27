@@ -66,16 +66,16 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
   const d = settings.decisions
   // Both keep what they show while they reload, so a change never empties the page or loses its place.
   const status = useResource(() => call('decisions', 'status'), JSON.stringify([d.on, d.models, d.servers]), { keep: true })
-  // While atelier-mini or atelier-step downloads, its progress comes with the status: ask again each second.
-  const downloading = status.data?.mini?.state === 'downloading' || status.data?.step?.state === 'downloading'
+  // While atelier-mini, atelier-step or atelier-vision downloads, its progress comes with the status: ask again each second.
+  const downloading = status.data?.mini?.state === 'downloading' || status.data?.step?.state === 'downloading' || status.data?.vision?.state === 'downloading'
   useEffect(() => {
     if (!downloading) return
     const timer = setInterval(() => void status.reload(), 1_000)
     return () => clearInterval(timer)
   }, [downloading]) // eslint-disable-line react-hooks/exhaustive-deps
-  const downloadAction = async (which: 'Mini' | 'Step', action: DownloadAction): Promise<void> => {
+  const downloadAction = async (which: 'Mini' | 'Step' | 'Vision', action: DownloadAction): Promise<void> => {
     try {
-      status.set(await call('decisions', `${action}${which}` as `install${'Mini' | 'Step'}`))
+      status.set(await call('decisions', `${action}${which}` as `install${'Mini' | 'Step' | 'Vision'}`))
     } catch (err) {
       toast.show({ tone: 'error', message: errorText(err) })
     }
@@ -245,6 +245,9 @@ export function QuickDecisionsPage({ settings, update, onOpenSection }: PageProp
                 step={status.data?.step}
                 stepModel={modelName('atelier-step', status.data?.stepVersion)}
                 onStep={(action) => void downloadAction('Step', action)}
+                vision={status.data?.vision}
+                visionModel={modelName('atelier-vision', status.data?.visionVersion)}
+                onVision={(action) => void downloadAction('Vision', action)}
               />
             ) : (
               <PresetRow key={id} id={id} hasKey={status.data?.keys[id] ?? false} onSave={(key) => saveKey(id, key)} onDisconnect={() => void disconnect(id)} />
@@ -468,7 +471,7 @@ function DownloadRow({ anchor, name, model, description, state, onAction }: { an
   )
 }
 
-/** Atelier's own model on this computer: no key to connect, only whether its files are here and whether you use it; its optional larger half, atelier-mini, and atelier-step for browser tasks, to download or remove. */
+/** Atelier's own model on this computer: no key to connect, only whether its files are here and whether you use it; its optional larger half, atelier-mini, atelier-step for browser tasks and atelier-vision for pictures, to download or remove. */
 function DeviceRow({
   id,
   installed,
@@ -480,6 +483,9 @@ function DeviceRow({
   step,
   stepModel,
   onStep,
+  vision,
+  visionModel,
+  onVision,
 }: {
   id: DecisionPresetId
   installed: boolean
@@ -491,6 +497,9 @@ function DeviceRow({
   step?: MiniStatus
   stepModel: string
   onStep(action: DownloadAction): void
+  vision?: MiniStatus
+  visionModel: string
+  onVision(action: DownloadAction): void
 }): ReactElement {
   const t = useT()
   return (
@@ -516,6 +525,9 @@ function DeviceRow({
       )}
       {step && step.state !== 'unavailable' && (
         <DownloadRow anchor="decisions-device-step" name={t('decisions.device.step')} model={stepModel} description={t('decisions.device.step.description')} state={step} onAction={onStep} />
+      )}
+      {vision && vision.state !== 'unavailable' && (
+        <DownloadRow anchor="decisions-device-vision" name={t('decisions.device.vision')} model={visionModel} description={t('decisions.device.vision.description')} state={vision} onAction={onVision} />
       )}
     </div>
   )

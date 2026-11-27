@@ -295,7 +295,10 @@ function savedDraft(summary: ChatSummary): DraftSetup {
 /** A chat's browser as a client tool drives it (AgentSession.chatBrowser). */
 export interface ChatBrowser {
   step(name: string, input: unknown, signal: AbortSignal): Promise<Awaited<ReturnType<BrowserToolExecutor['execute']>>>
-  page(tabId: string | null | undefined, signal: AbortSignal): ReturnType<BrowserToolExecutor['stepPage']>
+  /** `pictures`: also the pictures of controls the page gave no name, for atelier-vision to name. */
+  page(tabId: string | null | undefined, signal: AbortSignal, options?: { pictures?: boolean }): ReturnType<BrowserToolExecutor['stepPage']>
+  /** A picture of an element (by its reference) or, with null, of the page as it shows, for atelier-vision. */
+  picture(tabId: string | null | undefined, ref: string | null, signal: AbortSignal): ReturnType<BrowserToolExecutor['elementPicture']>
 }
 
 /** One chat's conversation with the agent: its fixed setup, history, queue and approvals. */
@@ -942,10 +945,15 @@ export class AgentSession {
     return {
       step: (name, input, signal) => this.#browserStep(name, input, signal),
       // Reading waits while paused too, and an interrupt ends it, as a browser step does.
-      page: async (tabId, signal) => {
+      page: async (tabId, signal, options) => {
         const step = this.#interrupt ? AbortSignal.any([signal, this.#interrupt.signal]) : signal
         await this.#gate.wait(step)
-        return this.executor.stepPage(tabId, step)
+        return this.executor.stepPage(tabId, step, options)
+      },
+      picture: async (tabId, ref, signal) => {
+        const step = this.#interrupt ? AbortSignal.any([signal, this.#interrupt.signal]) : signal
+        await this.#gate.wait(step)
+        return this.executor.elementPicture(tabId, ref, step)
       },
     }
   }
