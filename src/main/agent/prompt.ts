@@ -70,6 +70,7 @@ const CHAT_TOOL_LINES: Record<string, string> = {
   update_plan: 'update_plan shows the user a checklist for a longer task; send the whole list each time and keep it current.',
   delegate_task: 'delegate_task hands a self-contained piece of work to a helper chat (at most three at once) and waits for its result; give complete instructions, since the helper sees nothing else.',
   label_items: 'label_items answers the same yes-or-no, pick-one or rating questions about many items at once with the user\'s decision model; use it to sort, label, filter or check lists you have read (emails, results, products, rows, tabs), and judge the ones it marks "unsure" yourself.',
+  label_pictures: 'label_pictures answers the same yes-or-no, pick-one or rating questions about many pictures on a page at once (photos, product pictures, attachments, icons) with a small model on this computer that looks at them; give it the pictures\' refs and options that say what to look for, or a description to find among them, and look yourself at the ones it marks "unsure".',
   browser_steps: 'browser_steps runs a routine stretch of a browser task (an order up to the payment page, a form up to sending, a search to a result) page by page with a small model on this computer, far faster than doing each step yourself; give it the goal with where to stop and every value it may type, then check the page and carry on yourself when it hands back.',
 }
 

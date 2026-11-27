@@ -31,5 +31,8 @@ export const DECISIONS_SCHEMAS: {
     installStep: z.tuple([]),
     cancelStep: z.tuple([]),
     removeStep: z.tuple([]),
+    installVision: z.tuple([]),
+    cancelVision: z.tuple([]),
+    removeVision: z.tuple([]),
   },
 }

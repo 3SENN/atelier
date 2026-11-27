@@ -405,9 +405,12 @@ export interface DecisionsStatus {
   mini?: MiniStatus
   /** atelier-step, the optional model for browser tasks (deviceStep in feature.ts), in the same states as the mini. */
   step?: MiniStatus
-  /** The versions those two download (their manifests'), so Settings names the models it offers. */
+  /** atelier-vision, the optional model that looks at pictures (docs/decisions.md › Pictures), in the same states. */
+  vision?: MiniStatus
+  /** The versions those download (their manifests'), so Settings names the models it offers. */
   miniVersion?: string
   stepVersion?: string
+  visionVersion?: string
 }
 
 /**
@@ -491,5 +494,9 @@ export interface DecisionsServices {
     installStep(): Promise<DecisionsStatus>
     cancelStep(): Promise<DecisionsStatus>
     removeStep(): Promise<DecisionsStatus>
+    /** atelier-vision (pictures): the same for its download. */
+    installVision(): Promise<DecisionsStatus>
+    cancelVision(): Promise<DecisionsStatus>
+    removeVision(): Promise<DecisionsStatus>
   }
 }

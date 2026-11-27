@@ -8,7 +8,7 @@
 // resolves elements and points for clicks, and fills form fields. Main asks
 // over PAGE.command and the reply goes back on PAGE.reply.
 import { BRAND_NAME } from '@shared/branding'
-import type { StepPage, StepPageItem } from '@shared/browserSteps'
+import { STEP_UNNAMED_MAX, type StepPage, type StepPageItem } from '@shared/browserSteps'
 import { ipcRenderer } from 'electron'
 import {
   PAGE,
@@ -450,6 +450,7 @@ function stepPage(): StepPage {
   const items: StepPageItem[] = []
   const groups = new Map<Element, string>()
   let visited = 0
+  let unnamed = 0
   let truncated = false
   const text = (node: Node, group: string): void => {
     const s = clean(node.textContent, STEP_TEXT_MAX + 1)
@@ -474,6 +475,16 @@ function stepPage(): StepPage {
       if (!disabled) {
         const item = stepItem(el, kind, groups)
         if (item.label || kind === 'field' || kind === 'select') items.push(item)
+        else if ((kind === 'button' || kind === 'link') && unnamed < STEP_UNNAMED_MAX) {
+          // No name anywhere (a button with only an icon): its box goes along, so its picture can name it. Only one
+          // that is whole in the viewport and the size of a control, not a banner that happens to be a link.
+          const r = topViewportBox(el)
+          const whole = r.left >= 0 && r.top >= 0 && r.left + r.width <= window.innerWidth && r.top + r.height <= window.innerHeight
+          if (whole && r.width >= 12 && r.height >= 12 && r.width <= 160 && r.height <= 160) {
+            unnamed++
+            items.push({ ...item, box: { x: r.left, y: r.top, width: r.width, height: r.height } })
+          }
+        }
       }
       // A control's own text is its label, and a select's options are listed with it.
       if (LEAF_ROLES.has(role) || kind === 'select') return
@@ -482,7 +493,8 @@ function stepPage(): StepPage {
     for (const child of childrenOf(el)) visit(child)
   }
   visit(document.body ?? document.documentElement)
-  return { items, truncated }
+  const lang = clean(document.documentElement.lang, 20)
+  return { items, truncated, ...(lang ? { lang } : {}) }
 }
 
 // ---- find ----
@@ -582,7 +594,7 @@ function resolveRef(ref: string, scrollIntoView: boolean): ResolvedElement {
   if (scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' })
   const box = topViewportBox(el)
   if (box.width === 0 && box.height === 0) throw new Error(`${ref} is not visible on the page.`)
-  return { ...describe(el), x: box.left + box.width / 2, y: box.top + box.height / 2 }
+  return { ...describe(el), x: box.left + box.width / 2, y: box.top + box.height / 2, box: { x: box.left, y: box.top, width: box.width, height: box.height } }
 }
 
 function deepElementFromPoint(x: number, y: number): Element | null {

@@ -11,12 +11,23 @@
 // the chat's own browser steps (AgentSession.chatBrowser), so the pause, the site rules, the click guard and the
 // approvals are the agent's own. Whatever it isn't sure of goes back to the companion, which carries on with its own
 // browser tools: unsure, refused by the person, going in circles, a second add to the cart, done or blocked.
+//
+// A button with only an icon on it has no name in the page, so atelier-step could never choose it. With atelier-vision
+// on this computer (docs/decisions.md › Pictures) such a control is named from its picture, in the page's language:
+// which of all its jobs the icon stands for, and then whether it really is a button for that job, since among 63
+// answers something always looks likeliest and many icons (a logo, an anchor) are none of them. One it isn't sure of
+// on either count stays out of the step, as every unnamed control did before.
 
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { BROWSER_STEP_VALUES_MAX, BROWSER_STEPS_DEFAULT, BROWSER_STEPS_MAX, type BrowserStepsCard, type BrowserStepsStatus, type StepPageItem } from '@shared/browserSteps'
+import { CONTROL_ASK, CONTROL_IS, CONTROL_JOBS, CONTROL_LANGS, type ControlLang } from '@shared/visionControls'
+import type { LookAnswer } from '../../decisions/device'
 import type { StepAnswer } from '../../decisions/device/step'
 import type { StepElement, StepInput } from '../../decisions/device/stepFormat'
+import type { Question as VisionQuestion } from '../../decisions/device/visionFormat'
+import type { Picture } from '../../decisions/device/visionPreprocess'
+import { pictureKey } from '../../decisions/pictures'
 import type { ActionKind } from '@shared/agentTools'
 import { namesActionKind } from '../guard'
 import type { ChatBrowser } from '../session'
@@ -65,11 +76,91 @@ export interface StepModel {
   step(input: StepInput, signal: AbortSignal): Promise<StepAnswer>
 }
 
+/** atelier-vision, as this tool uses it: what a control's picture shows. */
+export interface PictureModel {
+  visionAvailable(): boolean
+  look(input: { picture?: Picture; vector?: Float32Array }, questions: Record<string, VisionQuestion>, signal: AbortSignal): Promise<LookAnswer>
+}
+
+/**
+ * A control is named from its picture when the model gives one job this much of its weight among all of them, and
+ * then says yes this surely to "is it a button for that job?". Measured with exactly these two questions and cutoffs
+ * (the atelier-decisions project, vision-v0.1, analysis/results/vision-buttons-v0.1.txt) on icons drawn by sets it
+ * never saw: 64% get their right name and 0.9% a wrong one, and of the buttons that are none of the jobs 9.9% are
+ * named anyway (19.6% with the readers' usual 0.75 and 0.7, which is why these are stricter). What it is less sure of
+ * stays unnamed.
+ */
+export const PICTURE_SURE = 0.9
+export const PICTURE_YES = 0.9
+
+/** The language to name a control in: the page's own when the model was trained in it, else English. */
+export function controlLang(pageLang: string | undefined): ControlLang {
+  const short = (pageLang ?? '').toLowerCase().split(/[-_]/)[0] ?? ''
+  return (CONTROL_LANGS as readonly string[]).includes(short) ? (short as ControlLang) : 'en'
+}
+
+/** "What does this button do?", with every job as an option, named in one language. */
+export function controlQuestion(lang: ControlLang): VisionQuestion {
+  return { type: 'choice', instructions: 'What does this button do?', criteria: Object.fromEntries(CONTROL_JOBS.map((job) => [job.key, job.names[lang]])) }
+}
+
+/** "Is this a button for <the job>?", with what a yes looks like, in two of the wordings the model was trained on. */
+export function controlCheck(lang: ControlLang, name: string): VisionQuestion {
+  return { type: 'noul', instructions: CONTROL_ASK[lang].replace('{name}', name), criteria: { true: CONTROL_IS[lang].replace('{name}', name) } }
+}
+
+/**
+ * The page's items with every unnamed control either named from its picture or left out. `seen` keeps what a
+ * picture was named before (by its pixels: a site's header icons are on every page), null for "not sure".
+ */
+export async function nameUnnamed(
+  items: StepPageItem[],
+  pictures: Record<string, Picture> | undefined,
+  lang: ControlLang,
+  model: PictureModel | null,
+  seen: Map<string, string | null>,
+  signal: AbortSignal,
+): Promise<StepPageItem[]> {
+  const out: StepPageItem[] = []
+  const question = controlQuestion(lang)
+  for (const item of items) {
+    if (item.label || item.role === 'text' || item.role === 'field' || item.role === 'select') {
+      out.push(item)
+      continue
+    }
+    const picture = pictures?.[item.ref]
+    if (!picture || !model?.visionAvailable()) continue
+    const key = `${lang}:${pictureKey(picture)}`
+    let name = seen.get(key)
+    if (name === undefined) {
+      name = null
+      try {
+        const first = await model.look({ picture }, { does: question }, signal)
+        const answer = first.answers.does
+        const job = answer?.type === 'choice' && (answer.probabilities[answer.choice] ?? 0) >= PICTURE_SURE ? CONTROL_JOBS.find((j) => j.key === answer.choice) : undefined
+        if (job) {
+          // The picture's vector is kept from the first question: the second costs no pass through the image tower.
+          const check = (await model.look({ vector: first.vector }, { is: controlCheck(lang, job.names[lang]) }, signal)).answers.is
+          if (check?.type === 'noul' && check.noul >= PICTURE_YES) name = job.names[lang]
+        }
+      } catch (err) {
+        if (signal.aborted) throw err
+        // The model failed on this one: the control stays unnamed, and the step goes on without it.
+      }
+      seen.set(key, name)
+    }
+    if (name) out.push({ ...item, label: name, seen: true })
+  }
+  return out
+}
+
 export interface BrowserStepsDeps {
-  /** The chat's browser (AgentHost.browserFor); null when the chat isn't loaded. */
-  browser(chatId: string): ChatBrowser | null
+  /** The chat's browser (AgentHost.browserFor), of which this tool reads pages and takes steps; null when the chat isn't loaded. */
+  browser(chatId: string): Pick<ChatBrowser, 'step' | 'page'> | null
   /** The on-device models (decisions/device.ts deviceSteps); null before start. */
   steps(): StepModel | null
+  /** atelier-vision, when it is installed, to name controls the page gave no name (the same on-device models). */
+  pictures?(): PictureModel | null
   /** Waits between reads of a page that rendered late (tests pass a no-op). */
   sleep?(ms: number): Promise<void>
 }
@@ -181,6 +272,9 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
     const before: string[] = []
     const signatures: string[] = []
     const refused = new Set<string>()
+    const vision = deps.pictures?.() ?? null
+    const looks = { pictures: vision?.visionAvailable() ?? false }
+    const named = new Map<string, string | null>()
     let added = false
     let lastKey = ''
     let same = 0
@@ -207,14 +301,14 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
     try {
       for (let n = 1; n <= max; n++) {
         if (ctx.signal.aborted) return end({ status: 'stopped', reason: 'Stopped.', note: '' })
-        let read = await browser.page(tabId, ctx.signal)
+        let read = await browser.page(tabId, ctx.signal, looks)
         tabId = read.tabId
         if (!read.page) return handBack('this tab has no page atelier-step can read (a blank tab or a PDF)', 'There was no page to work on.')
         let key = `${read.url}\n${JSON.stringify(read.page.items.map((i) => [i.ref, i.label, i.value, i.checked]))}`
         if (key === lastKey && n > 1) {
           // Pages that render after the load event: one more look before calling it unchanged.
           await sleep(SETTLE_MS)
-          read = await browser.page(tabId, ctx.signal)
+          read = await browser.page(tabId, ctx.signal, looks)
           if (!read.page) return handBack('the tab has no readable page any more', 'The page went away.')
           key = `${read.url}\n${JSON.stringify(read.page.items.map((i) => [i.ref, i.label, i.value, i.checked]))}`
         }
@@ -222,7 +316,8 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
         lastKey = key
         where = `${read.title || pathOf(read.url)} (${read.url})`
         if (same >= 2) return handBack('the page stopped changing after its steps', 'The page stopped changing.')
-        const items = read.page.items
+        // Controls the page gave no name are named from their pictures, or left out.
+        const items = await nameUnnamed(read.page.items, read.pictures, controlLang(read.page.lang), vision, named, ctx.signal)
         const elements = stepElements(items)
         const answer = await model.step({ goal: task.goal, values, before: [...before], page: `${read.title} (${pathOf(read.url)})`, elements }, ctx.signal)
         const ms = Math.round(answer.ms)
@@ -263,7 +358,7 @@ export function createBrowserStepsTool(deps: BrowserStepsDeps): ClientTool<Input
           }
           if (adds) added = true
           before.push(`clicked ${target.label}`)
-          card.steps.push({ text: `Clicked ${q(target.label)}`, ms })
+          card.steps.push({ text: target.seen ? `Clicked the ${q(target.label)} icon` : `Clicked ${q(target.label)}`, ms })
           emit()
           continue
         }

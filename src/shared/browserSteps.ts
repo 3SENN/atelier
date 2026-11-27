@@ -21,13 +21,26 @@ export interface StepPageItem {
   group: string
   /** A password, card or one-time-code field: never typed into. */
   guarded?: boolean
+  /**
+   * Where a link or button that the page gives no name sits in the viewport, in CSS pixels: a button with only an
+   * icon on it. Its picture is what names it (atelier-vision, docs/decisions.md › Pictures); one that stays unnamed
+   * is left out, as before.
+   */
+  box?: { x: number; y: number; width: number; height: number }
+  /** The name came from the control's picture, not from the page. */
+  seen?: boolean
 }
 
 export interface StepPage {
   items: StepPageItem[]
   /** More controls than were read (a very long page): the step model sees the beginning. */
   truncated: boolean
+  /** The language the page says it is in (`<html lang>`), for naming what it left unnamed. */
+  lang?: string
 }
+
+/** Unnamed controls one page read brings along: each is a capture and a pass through the image model. */
+export const STEP_UNNAMED_MAX = 12
 
 /** One thing the steps did, as the card lists it. */
 export interface BrowserStepLine {

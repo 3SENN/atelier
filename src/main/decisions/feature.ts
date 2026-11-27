@@ -15,9 +15,10 @@ import { registerResetStep } from '../reset'
 import { appRoot } from '../resources'
 import { registerStorageCategory } from '../storage'
 import type { FetchLike } from './client'
-import { DeviceDecisions, deviceModelDir, deviceStepDir, onnxRuntimeHere, setDeviceSteps } from './device'
+import { DeviceDecisions, deviceModelDir, deviceStepDir, deviceVisionDir, onnxRuntimeHere, setDeviceSteps } from './device'
 import { MINI_MANIFEST } from './device/miniManifest'
 import { STEP_MANIFEST } from './device/stepManifest'
+import { VISION_MANIFEST } from './device/visionManifest'
 import { MiniInstaller } from './deviceMini'
 import { DecisionKeys, KEYS_FILE } from './keys'
 import { COMPARISONS_FILE, Decisions, setDecider } from './service'
@@ -168,16 +169,19 @@ export function createDecisionsFeature(): Feature {
       // Its larger half, atelier-mini, is an optional download (deviceMini.ts); ATELIER_DECISION_MINI uses a folder as it is.
       // atelier-step, the model for browser tasks (docs/decisions.md › Browser tasks), is another optional download that
       // runs in the same helper; ATELIER_STEP_MODEL uses a folder as it is (in smoke runs too, so the tool can be checked).
+      // atelier-vision, the model that looks at pictures (docs/decisions.md › Pictures), is a third, with ATELIER_VISION_MODEL.
       let mini: MiniInstaller | null = null
       let stepInstaller: MiniInstaller | null = null
+      let visionInstaller: MiniInstaller | null = null
       const runtime = onnxRuntimeHere()
       if (!runtime) log.info('decisions', 'ONNX Runtime has no build for this computer: the on-device models are off', { platform: process.platform, arch: process.arch })
       const device = new DeviceDecisions({
         modelDir: () => (app.smoke || !runtime ? null : deviceModelDir({ packaged: electronApp.isPackaged, resourcesPath: process.resourcesPath, appPath: appRoot() })),
         miniDir: () => (app.smoke ? null : (mini?.dir() ?? null)),
         stepDir: () => (runtime ? (stepInstaller?.dir() ?? null) : null),
-        spawner: (dir, miniDir, stepDir) =>
-          utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), [dir, miniDir ?? '', stepDir ?? ''], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
+        visionDir: () => (runtime ? (visionInstaller?.dir() ?? null) : null),
+        spawner: (dir, miniDir, stepDir, visionDir) =>
+          utilityProcess.fork(join(__dirname, 'decisionsDevice.js'), [dir, miniDir ?? '', stepDir ?? '', visionDir ?? ''], { serviceName: 'Atelier quick decisions', stdio: 'ignore' }),
       })
       const installer = new MiniInstaller({
         dir: process.env.ATELIER_DECISION_MINI || join(app.dataDir, 'decision-model-mini'),
@@ -206,10 +210,25 @@ export function createDecisionsFeature(): Feature {
         release: () => device.restart(),
       })
       stepInstaller = steps
+      const visionFolder = process.env.ATELIER_VISION_MODEL
+      const vision = new MiniInstaller({
+        dir: visionFolder || join(app.dataDir, 'decision-model-vision'),
+        manifest: VISION_MANIFEST,
+        needsServer: false,
+        installed: deviceVisionDir,
+        external: Boolean(visionFolder) || app.smoke || !runtime,
+        download: async (url, init) => {
+          const res = await net.fetch(url, { signal: init.signal, headers: init.headers })
+          return { status: res.status, body: res.body as AsyncIterable<Uint8Array> | null }
+        },
+        release: () => device.restart(),
+      })
+      visionInstaller = vision
       setDeviceSteps(device)
       stops.push(() => {
         installer.cancel()
         steps.cancel()
+        vision.cancel()
         setDeviceSteps(null)
         device.dispose()
       })
@@ -223,6 +242,7 @@ export function createDecisionsFeature(): Feature {
         device,
         mini: installer,
         step: steps,
+        vision,
       })
       decider = d
       setDecider(d)
@@ -310,6 +330,18 @@ export function createDecisionsFeature(): Feature {
         },
         removeStep: async () => {
           steps.remove()
+          return d.status()
+        },
+        installVision: async () => {
+          void vision.install().then(() => log.info('decisions', 'atelier-vision download ended', { status: vision.status().state }))
+          return d.status()
+        },
+        cancelVision: async () => {
+          vision.cancel()
+          return d.status()
+        },
+        removeVision: async () => {
+          vision.remove()
           return d.status()
         },
         openKeyPage: (provider) => {

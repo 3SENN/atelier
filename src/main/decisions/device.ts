@@ -12,6 +12,10 @@ import { MINI_FILES, miniServer } from './device/miniFiles'
 import { STEP_FILES } from './device/stepFiles'
 import type { StepAnswer } from './device/step'
 import type { StepInput } from './device/stepFormat'
+import { VISION_FILES } from './device/visionFiles'
+import type { Answer as VisionAnswer } from './device/visionDecide'
+import type { Question as VisionQuestion } from './device/visionFormat'
+import type { Picture } from './device/visionPreprocess'
 import { log } from '../log'
 
 // The on-device decision model's main side (docs/decisions.md › On this device). Atelier's own small
@@ -57,6 +61,19 @@ export function deviceStepDir(dir: string): string | null {
   return STEP_FILES.every((f) => existsSync(join(dir, f))) ? dir : null
 }
 
+/** atelier-vision's folder (an optional download, feature.ts) when its files are all here, else null. */
+export function deviceVisionDir(dir: string): string | null {
+  return VISION_FILES.every((f) => existsSync(join(dir, f))) ? dir : null
+}
+
+/** What atelier-vision says about one picture: an answer per question, and the picture's vector to ask again or search by. */
+export interface LookAnswer {
+  model: string
+  answers: Record<string, VisionAnswer>
+  vector: Float32Array
+  ms: number
+}
+
 /** What the helper sends back: one reply per request id, and the mini's server once it runs. */
 type HelperReply = { id: number; type: 'result'; reply: unknown } | { id: number; type: 'error'; message: string } | { type: 'server'; pid: number }
 
@@ -68,12 +85,15 @@ export interface DeviceProcess {
 }
 
 /** Starts the helper: Electron's utility process in the app, anything with the same shape in tests. modelDir is ''
- *  when only atelier-step is here (it answers browser steps, and decisions read the model as not installed). */
-export type DeviceSpawner = (modelDir: string, miniDir: string | null, stepDir: string | null) => DeviceProcess
+ *  when only atelier-step or atelier-vision is here (they answer browser steps and pictures, and decisions read the
+ *  model as not installed). */
+export type DeviceSpawner = (modelDir: string, miniDir: string | null, stepDir: string | null, visionDir: string | null) => DeviceProcess
 
 const TIMEOUT_MS = 10_000
 /** With the mini: loading it takes a few seconds cold, and a request of many questions a few tenths each. Callers' own timeouts are shorter for most decisions. */
 const MINI_TIMEOUT_MS = 30_000
+/** A picture: loading atelier-vision takes a second or two cold, a picture a fraction of a second, a new question's texts a few hundredths each. */
+const VISION_TIMEOUT_MS = 20_000
 const IDLE_MS = 5 * 60_000
 /** Crashes in a row before the model counts as unavailable until Atelier restarts. */
 const CRASHES_MAX = 3
@@ -91,6 +111,8 @@ export interface DeviceDecisionsOptions {
   miniDir?(): string | null
   /** atelier-step's folder (deviceStepDir), read on each start (null or absent: browser steps are not available). */
   stepDir?(): string | null
+  /** atelier-vision's folder (deviceVisionDir), read on each start (null or absent: pictures are not looked at). */
+  visionDir?(): string | null
   spawner: DeviceSpawner
   idleMs?: number
   /** Stops the mini's server (default process.kill). */
@@ -104,6 +126,8 @@ export class DeviceDecisions {
   #procMini: string | null = null
   /** atelier-step's folder the running helper was started with. */
   #procStep: string | null = null
+  /** atelier-vision's folder the running helper was started with. */
+  #procVision: string | null = null
   /** The mini's server, started by the helper. */
   #server: number | null = null
   #nextId = 1
@@ -160,6 +184,28 @@ export class DeviceDecisions {
     return (await this.#request({ step: input }, signal)) as StepAnswer
   }
 
+  /** atelier-vision is here and the helper hasn't kept crashing. */
+  visionAvailable(): boolean {
+    return this.#crashes < CRASHES_MAX && (this.#opts.visionDir?.() ?? null) !== null
+  }
+
+  /**
+   * System One questions about one picture, answered by atelier-vision (docs/decisions.md › Pictures). The picture is
+   * its pixels, or the vector an earlier look gave back, which costs no second pass through the image tower.
+   */
+  async look(input: { picture?: Picture; vector?: Float32Array }, questions: Record<string, VisionQuestion>, signal: AbortSignal): Promise<LookAnswer> {
+    if (!this.visionAvailable()) throw new Error('atelier-vision is not installed.')
+    const reply = (await this.#request({ look: { picture: input.picture, vector: input.vector, questions } }, signal)) as LookAnswer
+    return { ...reply, vector: Float32Array.from(reply.vector) }
+  }
+
+  /** Vectors to search pictures by: for each text (null where it can't be read), and for a picture. */
+  async embed(input: { texts?: string[]; picture?: Picture }, signal: AbortSignal): Promise<{ texts: Array<Float32Array | null>; picture?: Float32Array }> {
+    if (!this.visionAvailable()) throw new Error('atelier-vision is not installed.')
+    const reply = (await this.#request({ embed: input }, signal)) as { texts: Array<ArrayLike<number> | null>; picture?: ArrayLike<number> }
+    return { texts: reply.texts.map((v) => (v ? Float32Array.from(v) : null)), ...(reply.picture ? { picture: Float32Array.from(reply.picture) } : {}) }
+  }
+
   /** Loads the small model ahead of the first question (it takes up to a second cold), so that one is answered in time too. The mini loads on its first question, not here: it needs up to 2 GB of memory. */
   warm(): void {
     if (!this.available()) return
@@ -175,7 +221,7 @@ export class DeviceDecisions {
     this.#stop()
   }
 
-  #request(request: { state: unknown; questions: unknown } | { step: StepInput }, signal: AbortSignal, nanoOnly = false): Promise<unknown> {
+  #request(request: { state: unknown; questions: unknown } | { step: StepInput } | { look: unknown } | { embed: unknown }, signal: AbortSignal, nanoOnly = false): Promise<unknown> {
     if (signal.aborted) return Promise.reject(new Error('The decision was stopped.'))
     const proc = this.#ensure()
     if (!proc) return Promise.reject(new Error('The on-device decision model is not available.'))
@@ -205,7 +251,7 @@ export class DeviceDecisions {
           cancel()
           reject(new Error('The on-device decision model took too long.'))
         },
-        this.#procMini && !('step' in request) ? MINI_TIMEOUT_MS : TIMEOUT_MS,
+        'look' in request || 'embed' in request ? VISION_TIMEOUT_MS : this.#procMini && !('step' in request) ? MINI_TIMEOUT_MS : TIMEOUT_MS,
       )
       signal.addEventListener('abort', onAbort, { once: true })
       this.#pending.set(id, {
@@ -220,7 +266,8 @@ export class DeviceDecisions {
         timer,
       })
       try {
-        proc.postMessage('step' in request ? { id, step: request.step } : nanoOnly ? { id, request, nanoOnly } : { id, request })
+        const own = 'step' in request || 'look' in request || 'embed' in request
+        proc.postMessage(own ? { id, ...request } : nanoOnly ? { id, request, nanoOnly } : { id, request })
       } catch (err) {
         done()
         reject(err instanceof Error ? err : new Error(String(err)))
@@ -232,14 +279,15 @@ export class DeviceDecisions {
   #ensure(): DeviceProcess | null {
     const mini = this.#opts.miniDir?.() ?? null
     const step = this.#opts.stepDir?.() ?? null
-    // The mini or atelier-step was installed or removed since the helper started: a new one picks that up, once nothing is waiting on this one.
-    if (this.#proc && (mini !== this.#procMini || step !== this.#procStep) && this.#pending.size === 0) this.#stop()
+    const vision = this.#opts.visionDir?.() ?? null
+    // The mini, atelier-step or atelier-vision was installed or removed since the helper started: a new one picks that up, once nothing is waiting on this one.
+    if (this.#proc && (mini !== this.#procMini || step !== this.#procStep || vision !== this.#procVision) && this.#pending.size === 0) this.#stop()
     if (this.#proc) return this.#proc
     const dir = this.#opts.modelDir()
-    if ((!dir && !step) || this.#crashes >= CRASHES_MAX) return null
+    if ((!dir && !step && !vision) || this.#crashes >= CRASHES_MAX) return null
     let proc: DeviceProcess
     try {
-      proc = this.#opts.spawner(dir ?? '', mini, step)
+      proc = this.#opts.spawner(dir ?? '', mini, step, vision)
     } catch (err) {
       log.warn('decisions', 'Could not start the on-device decision model', { error: err instanceof Error ? err.message : String(err) })
       this.#crashes = CRASHES_MAX
@@ -248,6 +296,7 @@ export class DeviceDecisions {
     this.#proc = proc
     this.#procMini = mini
     this.#procStep = step
+    this.#procVision = vision
     proc.on('message', (message) => this.#read(message))
     proc.once('exit', () => {
       if (this.#proc !== proc) return
@@ -255,6 +304,7 @@ export class DeviceDecisions {
       this.#proc = null
       this.#procMini = null
       this.#procStep = null
+      this.#procVision = null
       this.#killServer()
       if (hadWork) this.#crashes++
       for (const [, p] of this.#pending) p.reject(new Error('The on-device decision model stopped.'))
@@ -294,6 +344,7 @@ export class DeviceDecisions {
     this.#proc = null
     this.#procMini = null
     this.#procStep = null
+    this.#procVision = null
     for (const [, p] of this.#pending) p.reject(new Error('The on-device decision model was stopped.'))
     this.#pending.clear()
     try {
@@ -318,7 +369,7 @@ export class DeviceDecisions {
 }
 
 let current: DeviceDecisions | null = null
-/** The running on-device models, for the browser-steps tool (agent/tools/browserSteps.ts); null before start and after quit. */
+/** The running on-device models, for the tools that use them (agent/tools/browserSteps.ts, decisions/pictureTool.ts); null before start and after quit. */
 export function deviceSteps(): DeviceDecisions | null {
   return current
 }

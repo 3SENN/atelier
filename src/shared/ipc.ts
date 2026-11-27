@@ -562,6 +562,8 @@ export interface ResolvedElement extends ElementDescription {
   /** Center point in CSS pixels relative to the viewport. */
   x: number
   y: number
+  /** The element's box in CSS pixels relative to the viewport, for a picture of it (docs/decisions.md › Pictures). */
+  box: { x: number; y: number; width: number; height: number }
 }
 
 export interface ViewportInfo {

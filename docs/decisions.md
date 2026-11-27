@@ -260,6 +260,79 @@ where to stop, the values to type) and atelier-step takes it page by page throug
   10-18 s instead of 35-81 s. Alone it finishes none of them: it is a helper for routine stretches, never the only
   judge.
 
+### Pictures: atelier-vision (an optional download)
+
+The models above read text. atelier-vision looks at a picture: a photo, a scan, a screenshot, a button cut out of a
+page. It answers the same System One questions, asked about a picture, and it writes nothing: every answer is a short
+text ("A receipt from a shop or a restaurant", "Opens the shopping cart"), and the model says how well the picture
+matches each one. So a new use is a new question, not a new model.
+
+- **The model** (src/main/decisions/device/vision.ts, visionFormat.ts, visionDecide.ts, visionPreprocess.ts): two
+  towers from the atelier-decisions project (vision-v0.1, docs/vision-model.md there; SigLIP 2's, with what Atelier
+  needs trained in) that put a picture and a text in the same space. A picture becomes a vector once, in
+  about 0.3 s on two CPU threads; after that every question about it is a few short texts (kept: the same
+  answers are asked of many pictures) and a dot product, and the same vector finds the picture by a description.
+  A 260 MB download, and about 0.6 GB of memory while the helper holds it (it is loaded at the first picture).
+  The version's calibration (vision.json) is applied, so "sure" means what the readers' cutoffs take it to mean. `ATELIER_VISION_PARITY=<model folder> npx vitest run tests/decisionsVision.test.ts` checks that this
+  runtime makes the training code's tower input, token ids, vectors and answers on the version's fixtures.
+- **What a question looks like**: a choice's options and a yes/no question's `criteria.true` each say what the
+  picture shows when that is the answer. A choice's `instructions` are not read: the options carry the meaning, so
+  "the first one" means nothing to it. A text is read in lowercase and up to 63 tokens.
+- **What it declines** (`refusal`, so the rule or the companion decides): a text it can't read (its vocabulary is
+  trimmed to Latin-script languages, so other scripts fall apart into bytes: under 70% Latin letters, or over 10%
+  raw bytes), a text longer than it reads, an option without a text, and levels on a scale (`score`), which no
+  version has been measured on yet.
+- **Where it runs**: in the decision helper (deviceHelper.ts), as `{ id, look }` and `{ id, embed }` messages next to
+  the decision requests and browser steps; device.ts starts a new helper when it is installed or removed, and gives
+  the rest of Atelier `look(picture or vector, questions)` and `embed(texts, picture)`. It runs without the small
+  decision model too. A picture crosses to the helper as plain pixels (decisions/pictures.ts): Chromium already
+  decoded everything Atelier shows, so the helper has no image library; anything larger than 768 pixels on its
+  longest edge is made smaller first, which costs it nothing it can see (0.6% of a photo's readings change, none of a button's).
+- **The download** (feature.ts, the mini's installer with `needsServer: false`): five files listed in
+  `device/visionManifest.ts` with their sizes and SHA-256 and fetched from the version's tag on Hugging Face
+  (`3SENN/atelier-decisions`, `releases/vision-v0.1/model/`). Settings › Quick decisions › On this computer shows it
+  as "Pictures": Download, progress, Stop, Remove. `ATELIER_VISION_MODEL=<folder>` uses a folder as it is.
+- **Browser tasks: buttons with only an icon.** The page bridge's `stepPage` used to leave out every link and button
+  the page gives no name, so atelier-step could never choose a cart, a search or a close button drawn as an icon.
+  Now up to twelve of them a page come along with their box; while atelier-vision is here, the browser takes each
+  one's picture (browserTool.ts, the control's own box with three pixels of page around it, masked like a
+  screenshot) and `browser_steps` asks two questions about it (agent/tools/browserSteps.ts, `nameUnnamed`): which of
+  its 63 jobs is this, by name, in the page's language (src/shared/visionControls.ts, the names it was trained and
+  measured on), and then whether it really is a button for that job. It is named only when one job has 90% of the
+  weight and the second answer is a yes at 90% (stricter than the readers' usual 75% and 70%, a measured choice:
+  see below); otherwise it stays out of the step, as before. The second question
+  is there for buttons that are none of the jobs (a logo, an anchor): among 63 answers something always looks
+  likeliest. The same pixels are looked at once per run (a site's header icons are on every page), and the step's
+  card says "Clicked the “winkelwagen” icon". Every such click still passes the click guard and the approvals, and a
+  named delete, payment or send that the goal didn't ask for goes back to the companion like any other.
+- **Your companion: `label_pictures`** (agent/tools/labelPictures.ts) is `label_items` for pictures: up to 40
+  pictures on a page, each named by the ref of its element (an image, a thumbnail, a canvas, any element; or the
+  page as it shows), and one to five questions in the System One shape. Each picture is scrolled into view and
+  captured through the chat's own browser (the pause, the site rules, the masking of guarded fields), looked at
+  once, and read with the same cutoffs as `label_items`; "unsure" comes back with what the model leaned towards,
+  and a declined question with why. With `find`, a description ("the red sofa", "a boarding pass"), every picture
+  also gets how likely the description fits it and the pictures come back best first: search among a page's
+  pictures, with the description matched as what a yes looks like. It is offered to a new chat with the browser while atelier-vision is here; it
+  runs on this computer, so private chats have it too, and never in routines. Sorting photos into albums, picking
+  the receipts among attachments, finding the product pictures that show what was asked for: a fraction of a second
+  a picture instead of a screenshot and a model call each.
+- **What it is good at, measured** (the model project, vision-v0.1, on pictures and kinds it never trained on, read
+  with the cutoffs above): right 91% of the time over 22,625 held-out questions, sure enough to
+  act on 90% of them and right on 95% of those (SigLIP 2 as it comes: 74%, 56%, 89%). Sorting a photo into one of
+  13 albums 96% right; the kind of a document (a receipt, an invoice, a ticket ...) 99-100%, also kinds it never
+  trained on; a button's job among a few options 98% on icon sets it never saw; the state of a page (a cookie
+  notice, a pop-up, a sign-in wall, an error) 88% on layouts it never saw. For the unnamed buttons of a browser
+  task, with the two questions and the 90% cutoffs: 64% of icon buttons drawn a way it never saw get their right
+  name, 0.9% a wrong one, the rest stay out as before. A description finds its photo first among 40 pictures 96%
+  of the time, in English, Dutch, German, French and Spanish.
+- **Where it is weak**: a state of a page it never trained on (a robot check, a paywall) is a guess: 54% right, and
+  sure and wrong on 16-21%. One in ten buttons that are none of its 63 jobs (a logo, an anchor) is still named as
+  the job it looks most like. A yes/no about what is in a photo is sure and wrong on 7%; a choice among things on
+  2%. It does not read text (it sees a receipt, not the total), recognise faces or count. Buttons, documents and
+  pages were drawn for training by a real browser engine from real icon sets, but no number is from real websites
+  yet. A picture costs 0.3 s, so forty thumbnails take about twelve seconds the first time.
+
+
 ## The rule-first contract (DC-01)
 
 Every one of Atelier's decisions calls `decider().decide({ use, rule, request, read })`
@@ -325,8 +398,8 @@ unreachable provider stops the rest, and those items say so.
 It is offered to a new chat while a decision model is set up and "Labeling and
 sorting in tasks" is on, and never in a private chat; the system prompt then
 has one line on when to use it. `browser_steps` (Browser tasks, above) is the
-other decision-model tool: it runs on this computer, so private chats have it
-too. There is no Claude
+other decision-model tool, and `label_pictures` (Pictures, above) the third:
+both run on this computer, so private chats have them too. There is no Claude
 fallback on purpose: the companion is the Claude engine, so without the model
 it simply judges the items itself. What is sent is the items' text and the
 context.
@@ -487,6 +560,8 @@ itself and handed 25 to `label_items` on its own, which answered all 25.
 | src/main/decisions/keys.ts | the sealed keys |
 | src/main/decisions/uses.ts | Atelier's own questions and cutoffs |
 | src/main/decisions/tool.ts | `label_items`, the companion's tool |
+| src/main/decisions/device/vision*.ts, src/main/decisions/pictures.ts | atelier-vision's runtime in the helper, and pictures as the pixels it takes |
+| src/main/agent/tools/labelPictures.ts | `label_pictures`, the companion's tool for pictures on a page |
 | src/main/agent/turnDecisions.ts | effort per message and the skills' ranking at a chat's first message |
 | src/main/tabAutoGroup.ts | "Group tabs": the plan by site or by the model's answers |
 | src/renderer/src/overlay/surfaces/address/enter.ts | the address bar's Ask row first, and Enter |
