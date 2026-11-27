@@ -325,6 +325,11 @@ matches each one. So a new use is a new question, not a new model.
   task, with the two questions and the 90% cutoffs: 64% of icon buttons drawn a way it never saw get their right
   name, 0.9% a wrong one, the rest stay out as before. A description finds its photo first among 40 pictures 96%
   of the time, in English, Dutch, German, French and Spanish.
+- **How often a browser task needs it** (the model project's `vision-sites-v0.1.txt`): on the first screen of 39
+  well-known sites, 6,305 links and buttons are named by the page's own code and 175 (2.7%) are not; 9 of those are
+  in view and the size of a control, on 7 of the pages: four real buttons (two searches, a settings gear, an
+  account button), all named right, and five site logos, all left alone. A small gain for browser tasks, about one
+  page in ten; what the download is for is pictures themselves, which no page's code describes.
 - **Where it is weak**: a state of a page it never trained on (a robot check, a paywall) is a guess: 54% right, and
   sure and wrong on 16-21%. One in ten buttons that are none of its 63 jobs (a logo, an anchor) is still named as
   the job it looks most like. A yes/no about what is in a photo is sure and wrong on 7%; a choice among things on

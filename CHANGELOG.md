@@ -2,10 +2,10 @@
 
 All notable changes to Atelier. Versions follow [semantic versioning](https://semver.org/); dates are release dates.
 
-## Unreleased
+## 1.8.0 (2026-11-27) — Lighter when it matters
 
-- **Pictures, on this computer.** Download Pictures in Settings › Quick decisions › On this computer, and a model on your computer looks at pictures for your companion. Browser tasks can now use buttons that are only an icon, such as a cart, a search or a close button the page gives no name: the model names them from how they look, and leaves alone the ones it isn’t sure of. Your companion can also sort or check many pictures on a page at once, such as which album a photo belongs in or which attachments are receipts, and find the ones that fit a description, in a fraction of a second each. The model only chooses among the answers it is given and writes nothing; whatever it isn’t sure of goes back to your companion. Nothing it looks at leaves your computer.
 - **Lighter when it matters.** When your computer runs short of memory, tabs in the background now sleep within minutes instead of after two hours, and Atelier lets go of the models it only keeps loaded for speed. On battery, background tabs sleep after half an hour at most and nothing is loaded before you need it. Both are switches in Settings › General › Tabs: Memory saver and Energy saver. A downloaded model that an update made out of date is now removed instead of sitting on your disk until you download the new one.
+- **Pictures, on this computer (an optional download).** Download Pictures in Settings › Quick decisions › On this computer (260 MB), and a model on your computer looks at pictures for your companion: it sorts or checks many pictures on a page at once, such as which album a photo belongs in or which attachments are receipts, and finds the ones that fit a description, in a fraction of a second each. In browser tasks it also names the few buttons a page leaves without a name, from their icon. Websites name nearly all their buttons themselves (97% on the first screen of 39 well-known sites), so that part is a small gain: about one page in ten has a button it adds. It is not perfect at either job: it leaves alone what it isn’t sure of, and that goes back to your companion. The model only chooses among the answers it is given and writes nothing, and nothing it looks at leaves your computer. Without the download, nothing changes and nothing is loaded.
 
 ## 1.7.2 (2026-11-25) — Windows tells you about updates
 

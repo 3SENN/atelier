@@ -12,6 +12,25 @@ import type { WhatsNewEntry } from './updates'
 // card combines every entry since the version you last saw.
 export const WHATS_NEW: readonly WhatsNewEntry[] = [
   {
+    version: '1.8.0',
+    date: '2026-11-27',
+    title: 'Lighter when it matters',
+    highlights: [
+      {
+        title: 'Memory saver',
+        body: 'When your computer runs short of memory, tabs in the background sleep within minutes instead of after two hours. Pinned tabs, tabs playing sound and tabs with a form you started stay awake. Settings › General › Tabs.',
+      },
+      {
+        title: 'Energy saver',
+        body: 'On battery, tabs in the background sleep after half an hour at most, and nothing is loaded before you need it.',
+      },
+      {
+        title: 'Pictures, if you want them',
+        body: 'An optional download in Settings › Quick decisions: a model on your computer that sorts and finds pictures on a page for your companion, and names the few buttons a page leaves without a name. Nothing it looks at leaves your computer.',
+      },
+    ],
+  },
+  {
     version: '1.7.2',
     date: '2026-11-25',
     title: 'Windows tells you about updates',
